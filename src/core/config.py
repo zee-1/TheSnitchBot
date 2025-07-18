@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     cosmos_container_servers: str = Field("servers", env="COSMOS_CONTAINER_SERVERS")
     cosmos_container_tips: str = Field("tips", env="COSMOS_CONTAINER_TIPS")
     cosmos_container_newsletters: str = Field("newsletters", env="COSMOS_CONTAINER_NEWSLETTERS")
+    cosmos_container_messages: str = Field("messages", env="COSMOS_CONTAINER_MESSAGES")
     
     # Azure Blob Storage
     blob_connection_string: str = Field(..., env="BLOB_CONNECTION_STRING")

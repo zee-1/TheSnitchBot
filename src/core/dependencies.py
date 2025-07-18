@@ -13,6 +13,7 @@ from src.data.cosmos_client import CosmosDBClient, get_cosmos_client
 from src.data.repositories.server_repository import ServerRepository
 from src.data.repositories.tip_repository import TipRepository
 from src.data.repositories.newsletter_repository import NewsletterRepository
+from src.data.repositories.message_repository import MessageRepository
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +74,12 @@ class DependencyContainer:
             container_name=self._settings.cosmos_container_newsletters
         )
         
+        # Message repository
+        self._instances['message_repository'] = MessageRepository(
+            cosmos_client=self._cosmos_client,
+            container_name=self._settings.cosmos_container_messages
+        )
+        
         logger.info("All repositories initialized")
     
     async def close(self) -> None:
@@ -108,6 +115,10 @@ class DependencyContainer:
     def get_newsletter_repository(self) -> NewsletterRepository:
         """Get newsletter repository."""
         return self._get_instance('newsletter_repository', NewsletterRepository)
+    
+    def get_message_repository(self) -> MessageRepository:
+        """Get message repository."""
+        return self._get_instance('message_repository', MessageRepository)
     
     def _get_instance(self, key: str, expected_type: type) -> Any:
         """Get instance from container with type checking."""
@@ -202,6 +213,12 @@ async def get_newsletter_repository_dependency() -> NewsletterRepository:
     return container.get_newsletter_repository()
 
 
+async def get_message_repository_dependency() -> MessageRepository:
+    """Get message repository dependency."""
+    container = await get_container()
+    return container.get_message_repository()
+
+
 # Context manager for dependency container
 class DependencyContext:
     """Context manager for dependency container lifecycle."""
@@ -264,6 +281,11 @@ class ServiceLocator:
     def newsletter_repository(self) -> NewsletterRepository:
         """Get newsletter repository."""
         return self._container.get_newsletter_repository()
+    
+    @property
+    def message_repository(self) -> MessageRepository:
+        """Get message repository."""
+        return self._container.get_message_repository()
 
 
 async def get_service_locator() -> ServiceLocator:
@@ -302,7 +324,8 @@ async def create_mock_container() -> DependencyContainer:
     container._instances = {
         'server_repository': Mock(spec=ServerRepository),
         'tip_repository': Mock(spec=TipRepository),
-        'newsletter_repository': Mock(spec=NewsletterRepository)
+        'newsletter_repository': Mock(spec=NewsletterRepository),
+        'message_repository': Mock(spec=MessageRepository)
     }
     
     container._initialized = True
@@ -332,6 +355,9 @@ def validate_dependencies(container: DependencyContainer) -> Dict[str, bool]:
         
         newsletter_repo = container.get_newsletter_repository()
         validation_results['newsletter_repository'] = newsletter_repo is not None
+        
+        message_repo = container.get_message_repository()
+        validation_results['message_repository'] = message_repo is not None
         
         # Overall validation
         validation_results['all_valid'] = all(validation_results.values())
