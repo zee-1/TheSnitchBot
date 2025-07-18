@@ -1,0 +1,1 @@
+# Discord integration for The Snitch Discord Bot
