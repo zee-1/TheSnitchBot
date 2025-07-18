@@ -1,0 +1,1 @@
+# Data access layer for The Snitch Discord Bot

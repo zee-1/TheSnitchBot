@@ -1,0 +1,69 @@
+# Azure Functions
+azure-functions==1.18.0
+azure-functions-worker==1.0.0
+
+# Azure SDK
+azure-cosmos==4.5.1
+azure-storage-blob==12.19.0
+azure-servicebus==7.11.4
+azure-keyvault-secrets==4.7.0
+azure-monitor-opentelemetry==1.2.0
+azure-identity==1.15.0
+
+# Discord
+discord.py==2.3.2
+
+# AI/ML
+langchain==0.1.0
+langchain-community==0.0.13
+groq==0.4.1
+chromadb==0.4.18
+sentence-transformers==2.2.2
+openai==1.6.1
+
+# HTTP & Async
+httpx==0.25.2
+aiohttp==3.9.1
+requests==2.31.0
+
+# Data & Validation
+pydantic==2.5.0
+pydantic-settings==2.1.0
+python-dotenv==1.0.0
+
+# Database
+asyncpg==0.29.0
+sqlalchemy==2.0.23
+
+# Logging & Monitoring
+structlog==23.2.0
+opentelemetry-api==1.21.0
+opentelemetry-sdk==1.21.0
+opentelemetry-instrumentation==0.42b0
+
+# Date/Time
+python-dateutil==2.8.2
+pytz==2023.3
+
+# Utilities
+typing-extensions==4.8.0
+python-multipart==0.0.6
+uvloop==0.19.0
+
+# Testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-mock==3.12.0
+pytest-cov==4.1.0
+factory-boy==3.3.0
+
+# Development
+black==23.11.0
+flake8==6.1.0
+mypy==1.7.1
+pre-commit==3.6.0
+isort==5.12.0
+
+# Security
+cryptography==41.0.7
+bcrypt==4.1.2

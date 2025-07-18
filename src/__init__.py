@@ -1,0 +1,1 @@
+# The Snitch Discord Bot - Main Package
