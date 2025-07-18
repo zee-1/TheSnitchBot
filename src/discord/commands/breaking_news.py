@@ -101,20 +101,26 @@ class BreakingNewsCommand(PublicCommand):
                 return
             
             # Get AI service for processing
-            # TODO: This will be implemented when we create the AI service
-            # For now, create a mock breaking news bulletin
-            
-            # Mock implementation - replace with actual AI service
-            if settings.mock_ai_responses:
+            try:
+                from src.ai import get_ai_service
+                ai_service = await get_ai_service()
+                
+                # Use mock responses if enabled in settings
+                if settings.mock_ai_responses:
+                    bulletin = await self._generate_mock_bulletin(filtered_messages, ctx)
+                else:
+                    # Generate smart breaking news using AI service
+                    bulletin = await ai_service.generate_smart_breaking_news(
+                        messages=filtered_messages,
+                        persona=ctx.server_config.persona,
+                        server_id=ctx.guild_id,
+                        channel_context=f"#{ctx.channel.name} recent activity"
+                    )
+                    
+            except Exception as ai_error:
+                logger.warning(f"AI service failed, falling back to mock: {ai_error}")
+                # Fallback to mock if AI service fails
                 bulletin = await self._generate_mock_bulletin(filtered_messages, ctx)
-            else:
-                # This will be implemented with the AI service
-                embed = EmbedBuilder.error(
-                    "Service Unavailable",
-                    "AI service is not yet implemented. Please try again later."
-                )
-                await ctx.respond(embed=embed)
-                return
             
             # Create breaking news embed
             embed = EmbedBuilder.newsletter(

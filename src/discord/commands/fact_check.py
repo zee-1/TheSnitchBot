@@ -6,6 +6,7 @@ Provides humorous, non-authoritative verdicts on messages.
 import discord
 from typing import Dict, Any
 import random
+from datetime import datetime
 
 from src.discord.commands.base import PublicCommand, CommandContext, EmbedBuilder
 from src.core.exceptions import InvalidCommandArgumentError
@@ -100,16 +101,28 @@ class FactCheckCommand(PublicCommand):
                 return
             
             # Generate fact-check verdict
-            if settings.mock_ai_responses:
+            try:
+                if settings.mock_ai_responses:
+                    verdict = await self._generate_mock_verdict(target_message, ctx)
+                else:
+                    # Use AI service for fact checking
+                    from src.ai import get_ai_service
+                    ai_service = await get_ai_service()
+                    
+                    # Analyze the message content for fact-checking
+                    analysis = await ai_service.groq_client.analyze_content(
+                        content=target_message.content,
+                        analysis_type="fact_check",
+                        context=f"Discord message fact-check with {ctx.server_config.persona.value} persona"
+                    )
+                    
+                    # Convert AI response to verdict format
+                    verdict = await self._convert_ai_response_to_verdict(analysis, ctx)
+                    
+            except Exception as ai_error:
+                logger.warning(f"AI fact-check failed, falling back to mock: {ai_error}")
+                # Fallback to mock if AI service fails
                 verdict = await self._generate_mock_verdict(target_message, ctx)
-            else:
-                # This will be implemented with the AI service
-                embed = EmbedBuilder.error(
-                    "Service Unavailable",
-                    "AI service is not yet implemented. Please try again later."
-                )
-                await ctx.respond(embed=embed)
-                return
             
             # Create fact-check response
             embed = self._create_verdict_embed(target_message, verdict, ctx)
@@ -138,6 +151,123 @@ class FactCheckCommand(PublicCommand):
             )
             await ctx.respond(embed=embed)
             logger.error(f"Error in fact-check command: {e}", exc_info=True)
+    
+    async def _convert_ai_response_to_verdict(self, analysis: str, ctx: CommandContext) -> Dict[str, Any]:
+        """Convert AI analysis response to verdict format."""
+        
+        # Parse AI response for verdict category
+        analysis_lower = analysis.lower().strip()
+        
+        # Determine category based on AI response
+        if "true" in analysis_lower and "false" not in analysis_lower:
+            category = "true"
+        elif "false" in analysis_lower and "true" not in analysis_lower:
+            category = "false"  
+        elif "needs investigation" in analysis_lower or "investigation" in analysis_lower:
+            category = "needs_investigation"
+        else:
+            # Default to needs investigation if unclear
+            category = "needs_investigation"
+        
+        # Get persona-specific response using the same format as mock
+        persona = ctx.server_config.persona.value
+        
+        # Define verdict structure (same as mock)
+        verdicts = {
+            'true': {
+                'emoji': '✅',
+                'title': 'TRUE',
+                'color': discord.Color.green(),
+                'responses': {
+                    'sassy_reporter': [
+                        "Okay, I'll give you this one. ✅",
+                        "Finally, someone who knows what they're talking about!",
+                        "Breaking: User actually tells the truth! More at 11."
+                    ],
+                    'investigative_journalist': [
+                        "After careful analysis, this statement appears factual.",
+                        "Cross-referencing sources... verdict: CONFIRMED ✅",
+                        "Investigation concludes: Statement verified."
+                    ],
+                    'sports_commentator': [
+                        "GOAL! That's a solid fact right there! ⚽",
+                        "AND IT'S GOOD! Facts don't lie!",
+                        "What a play! Truth wins the day!"
+                    ],
+                    'default': [
+                        "This appears to be accurate! ✅",
+                        "Fact-check verdict: TRUE",
+                        "Confirmed: This checks out!"
+                    ]
+                }
+            },
+            'false': {
+                'emoji': '❌', 
+                'title': 'FALSE',
+                'color': discord.Color.red(),
+                'responses': {
+                    'sassy_reporter': [
+                        "Honey, no. Just... no. ❌",
+                        "This is more cap than a baseball game! 🧢",
+                        "Breaking: Local user spreads misinformation. Shocking!"
+                    ],
+                    'investigative_journalist': [
+                        "Extensive fact-checking reveals this to be FALSE.",
+                        "Investigation determines: Statement inaccurate.",
+                        "Evidence overwhelmingly refutes this assertion."
+                    ],
+                    'sports_commentator': [
+                        "FUMBLE! That statement didn't make it to the end zone!",
+                        "STRIKE THREE! That claim is OUT!",
+                        "PENALTY FLAG! False statement, 15 yard penalty!"
+                    ],
+                    'default': [
+                        "This statement appears to be false. ❌",
+                        "Fact-check verdict: FALSE",
+                        "Disputed: This doesn't check out."
+                    ]
+                }
+            },
+            'needs_investigation': {
+                'emoji': '🔍',
+                'title': 'NEEDS INVESTIGATION', 
+                'color': discord.Color.orange(),
+                'responses': {
+                    'sassy_reporter': [
+                        "Hmm, this one's sus. Need to dig deeper. 🔍",
+                        "The jury's still out on this tea... ☕",
+                        "This needs more investigation than my dating life."
+                    ],
+                    'investigative_journalist': [
+                        "Insufficient evidence to make a determination. 🔍",
+                        "This claim requires further investigation.",
+                        "Investigation ongoing. Verdict pending."
+                    ],
+                    'sports_commentator': [
+                        "WE'RE GOING TO THE REPLAY BOOTH ON THIS ONE! 📹",
+                        "UNDER REVIEW! The facts are still being examined!",
+                        "TIME OUT! Need to check the playbook on this one!"
+                    ],
+                    'default': [
+                        "This requires further investigation. 🔍",
+                        "Fact-check verdict: NEEDS MORE INFO",
+                        "Status: Under review."
+                    ]
+                }
+            }
+        }
+        
+        verdict_info = verdicts[category]
+        persona_responses = verdict_info['responses'].get(persona, verdict_info['responses']['default'])
+        
+        import random
+        return {
+            'category': category,
+            'emoji': verdict_info['emoji'],
+            'title': verdict_info['title'], 
+            'color': verdict_info['color'],
+            'response': random.choice(persona_responses)
+        }
     
     async def _generate_mock_verdict(self, message, ctx: CommandContext) -> Dict[str, Any]:
         """Generate mock fact-check verdict for testing."""

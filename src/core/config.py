@@ -120,6 +120,11 @@ class Settings(BaseSettings):
         """Get ChromaDB URL."""
         return f"http://{self.chroma_host}:{self.chroma_port}"
     
+    @property
+    def CHROMA_DB_PATH(self) -> str:
+        """Get ChromaDB persistence path (alias for embedding service)."""
+        return self.chroma_persist_directory
+    
     class Config:
         """Pydantic configuration."""
         env_file = ".env"
