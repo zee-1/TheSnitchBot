@@ -138,15 +138,18 @@ def check_directories():
 def check_required_packages():
     """Check if required packages are installed."""
     required_packages = [
-        "discord.py",
+        "discord",  # discord.py
         "pydantic",
-        "azure-cosmos",
-        "azure-storage-blob",
-        "azure-servicebus", 
+        "azure.cosmos",  # azure-cosmos
+        "azure.storage.blob",  # azure-storage-blob  
+        "azure.servicebus",  # azure-servicebus
         "groq",
-        "chromadb",
-        "sentence-transformers",
-        "numpy"
+        "chromadb", 
+        "sentence_transformers",  # sentence-transformers
+        "numpy",
+        "langchain",
+        "httpx",
+        "structlog"
     ]
     
     missing_packages = []
@@ -161,7 +164,8 @@ def check_required_packages():
     
     if missing_packages:
         print(f"\n📦 Install missing packages with:")
-        print(f"pip install {' '.join(missing_packages)}")
+        print(f"pip install -r requirements-minimal.txt")
+        print(f"Or for development: pip install -r requirements-dev.txt")
         return False
     
     return True

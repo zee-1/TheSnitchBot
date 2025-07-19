@@ -1,0 +1,51 @@
+# The Snitch Discord Bot - Development Requirements
+# Additional tools for development, testing, and code quality
+
+# Include all core requirements
+-r requirements-minimal.txt
+
+# Testing Framework
+pytest==7.4.4
+pytest-asyncio==0.23.2
+pytest-mock==3.12.0
+pytest-cov==4.1.0
+factory-boy==3.3.0
+
+# Code Formatting & Linting
+black==23.12.1
+flake8==7.0.0
+mypy==1.8.0
+isort==5.12.0
+
+# Pre-commit Hooks
+pre-commit==3.6.0
+
+# Security Scanning
+bandit==1.7.5
+safety==2.3.4
+
+# Development Utilities
+rich==13.7.0
+click==8.1.7
+typer==0.9.0
+
+# Enhanced Logging for Development
+colorlog==6.8.0
+python-json-logger==2.0.7
+
+# Performance Monitoring
+psutil==5.9.6
+
+# Version Control
+GitPython==3.1.40
+
+# File Processing
+PyYAML==6.0.1
+toml==0.10.2
+aiofiles==23.2.1
+
+# Image Processing (for testing embeds)
+Pillow==10.2.0
+
+# Enhanced Async Support
+asyncio-mqtt==0.16.1
