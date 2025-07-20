@@ -97,7 +97,7 @@ class SubmitTipCommand(PublicCommand):
             tip.category = tip_category
             
             # Save tip to repository
-            tip_repo = TipRepository(ctx.container.cosmos_client)
+            tip_repo = TipRepository(ctx.container._cosmos_client,container_name='content_data')
             await tip_repo.create(tip)
             
             # Create success response
