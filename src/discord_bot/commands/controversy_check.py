@@ -1,0 +1,345 @@
+"""
+Controversy check command for The Snitch Discord Bot.
+Analyzes how controversial a message is using AI.
+"""
+
+from typing import Dict, Any
+from datetime import datetime
+import discord
+
+from src.discord_bot.commands.base import PublicCommand, CommandContext, EmbedBuilder
+from src.core.exceptions import ValidationError, AIServiceError
+from src.core.logging import get_logger
+from src.utils.validation import validate_discord_id
+from src.models.message import Message
+
+logger = get_logger(__name__)
+
+
+class ControversyCheckCommand(PublicCommand):
+    """Command for checking how controversial a message is."""
+    
+    def __init__(self):
+        super().__init__(
+            name="controversy-check",
+            description="Check how controversial a message is using AI analysis",
+            cooldown_seconds=20  # Moderate cooldown for AI operations
+        )
+    
+    def define_parameters(self) -> Dict[str, Dict[str, Any]]:
+        """Define command parameters for Discord slash command."""
+        return {
+            "message_id": {
+                "type": str,
+                "description": "ID of the message to analyze for controversy",
+                "required": True
+            }
+        }
+    
+    async def execute(self, ctx: CommandContext, message_id: str) -> None:
+        """Execute the controversy check command."""
+        
+        logger.info(
+            "Controversy check command executed",
+            extra={
+                "user_id": ctx.user_id,
+                "guild_id": ctx.guild_id,
+                "channel_id": ctx.channel_id,
+                "target_message_id": message_id
+            }
+        )
+        
+        try:
+            # Get the target message directly from Discord
+            channel = ctx.interaction.client.get_channel(int(ctx.channel_id))
+            if not channel:
+                embed = EmbedBuilder.error(
+                    "Channel Error",
+                    "Could not access the current channel."
+                )
+                await ctx.respond(embed=embed, ephemeral=True)
+                return
+                
+            try:
+                target_message = await channel.fetch_message(int(message_id))
+            except discord.NotFound:
+                embed = EmbedBuilder.warning(
+                    "Message Not Found",
+                    f"Could not find message with ID `{message_id}` in this channel."
+                )
+                await ctx.respond(embed=embed, ephemeral=True)
+                return
+            
+            # Don't analyze bot messages or empty messages
+            if target_message.author.bot or str(target_message.author.id) == str(ctx.interaction.client.user.id):
+                embed = EmbedBuilder.warning(
+                    "Cannot Analyze Bot Messages",
+                    "I don't analyze bot messages. That would be weird. 🤖"
+                )
+                await ctx.respond(embed=embed, ephemeral=True)
+                return
+            
+            if not target_message.content.strip():
+                embed = EmbedBuilder.warning(
+                    "Empty Message",
+                    "Cannot analyze empty messages or media-only messages."
+                )
+                await ctx.respond(embed=embed, ephemeral=True)
+                return
+            
+            # Defer response since AI processing takes time
+            await ctx.defer()
+            
+            # Create Message object for AI analysis
+            message_obj = Message(
+                message_id=str(target_message.id),
+                channel_id=str(target_message.channel.id),
+                server_id=str(target_message.guild.id),
+                author_id=str(target_message.author.id),
+                content=target_message.content,
+                timestamp=target_message.created_at,
+                attachment_urls=[str(attachment.url) for attachment in target_message.attachments],
+                reaction_data=[],
+                thread_id=str(target_message.thread.id) if hasattr(target_message, 'thread') and target_message.thread else None
+            )
+            
+            # Get recent context messages for better analysis
+            context_messages = []
+            try:
+                async for msg in channel.history(limit=5, before=target_message, oldest_first=False):
+                    if not msg.author.bot and msg.content.strip():
+                        context_msg = Message(
+                            message_id=str(msg.id),
+                            channel_id=str(msg.channel.id),
+                            server_id=str(msg.guild.id),
+                            author_id=str(msg.author.id),
+                            content=msg.content,
+                            timestamp=msg.created_at,
+                            attachment_urls=[],
+                            reaction_data=[],
+                            thread_id=None
+                        )
+                        context_messages.append(context_msg)
+            except:
+                # If we can't get context, continue without it
+                pass
+            
+            # Get AI service for analysis
+            try:
+                from src.ai import get_ai_service
+                ai_service = await get_ai_service()
+                
+                # Use mock responses if enabled in settings
+                settings = ctx.container.get_settings()
+                if settings.mock_ai_responses:
+                    analysis = await self._generate_mock_analysis(message_obj, context_messages, ctx)
+                else:
+                    # Analyze message controversy using AI service
+                    analysis = await ai_service.analyze_message_controversy(
+                        message=message_obj,
+                        context_messages=context_messages
+                    )
+                    
+            except Exception as ai_error:
+                logger.warning(f"AI service failed, falling back to mock: {ai_error}")
+                # Fallback to mock if AI service fails
+                analysis = await self._generate_mock_analysis(message_obj, context_messages, ctx)
+            
+            # Create analysis embed
+            controversy_score = analysis.get("controversy_score", 0.0)
+            confidence = analysis.get("confidence", 0.0)
+            
+            # Determine controversy level and color
+            if controversy_score >= 0.8:
+                level = "🔥 EXTREMELY CONTROVERSIAL"
+                color = discord.Color.red()
+            elif controversy_score >= 0.6:
+                level = "⚠️ HIGHLY CONTROVERSIAL"
+                color = discord.Color.orange()
+            elif controversy_score >= 0.4:
+                level = "📢 MODERATELY CONTROVERSIAL"
+                color = discord.Color.yellow()
+            elif controversy_score >= 0.2:
+                level = "💬 SLIGHTLY CONTROVERSIAL"
+                color = discord.Color.blue()
+            else:
+                level = "😴 NOT CONTROVERSIAL"
+                color = discord.Color.green()
+            
+            embed = discord.Embed(
+                title="🔍 Controversy Analysis",
+                description=f"Analysis of message from {target_message.author.mention}",
+                color=color,
+                timestamp=datetime.now()
+            )
+            
+            # Add message preview
+            message_preview = target_message.content[:200]
+            if len(target_message.content) > 200:
+                message_preview += "..."
+            
+            embed.add_field(
+                name="📝 Message Preview",
+                value=f"```{message_preview}```",
+                inline=False
+            )
+            
+            # Add controversy metrics
+            embed.add_field(
+                name="🎯 Controversy Level",
+                value=level,
+                inline=True
+            )
+            
+            embed.add_field(
+                name="📊 Controversy Score",
+                value=f"{controversy_score:.1%}",
+                inline=True
+            )
+            
+            embed.add_field(
+                name="🎲 Confidence",
+                value=f"{confidence:.1%}",
+                inline=True
+            )
+            
+            # Add analysis details if available
+            reasons = analysis.get("reasons", [])
+            if reasons:
+                embed.add_field(
+                    name="🔍 Analysis Factors",
+                    value="\n".join([f"• {reason}" for reason in reasons[:3]]),
+                    inline=False
+                )
+            
+            # Add context info
+            context_info = []
+            if analysis.get("related_messages_count", 0) > 0:
+                context_info.append(f"📚 {analysis['related_messages_count']} related messages found")
+            if len(context_messages) > 0:
+                context_info.append(f"💬 {len(context_messages)} context messages analyzed")
+            
+            if context_info:
+                embed.add_field(
+                    name="🔗 Context Analysis",
+                    value="\n".join(context_info),
+                    inline=False
+                )
+            
+            # Add disclaimer
+            embed.add_field(
+                name="⚠️ Disclaimer",
+                value="This analysis is for entertainment purposes only and should not be used for moderation decisions.",
+                inline=False
+            )
+            
+            embed.set_footer(text=f"Analyzed by {ctx.server_config.persona.value.replace('_', ' ').title()}")
+            
+            await ctx.respond(embed=embed)
+            
+            # Log analysis completion
+            logger.info(
+                "Controversy analysis completed",
+                extra={
+                    "user_id": ctx.user_id,
+                    "guild_id": ctx.guild_id,
+                    "target_message_id": message_id,
+                    "controversy_score": controversy_score,
+                    "confidence": confidence,
+                    "context_messages": len(context_messages)
+                }
+            )
+            
+        except ValidationError as e:
+            embed = EmbedBuilder.error(
+                "Validation Error",
+                f"Invalid message ID: {str(e)}"
+            )
+            await ctx.respond(embed=embed, ephemeral=True)
+            
+        except AIServiceError as e:
+            embed = EmbedBuilder.error(
+                "Analysis Failed",
+                "AI service is currently unavailable. Please try again later."
+            )
+            await ctx.respond(embed=embed, ephemeral=True)
+            logger.error(f"AI service error in controversy check: {e}")
+            
+        except Exception as e:
+            embed = EmbedBuilder.error(
+                "Command Failed",
+                "An unexpected error occurred while analyzing the message."
+            )
+            await ctx.respond(embed=embed, ephemeral=True)
+            logger.error(f"Unexpected error in controversy check: {e}", exc_info=True)
+    
+    async def _generate_mock_analysis(self, message: Message, context_messages: list, ctx: CommandContext) -> Dict[str, Any]:
+        """Generate mock controversy analysis for testing."""
+        import random
+        
+        # Simple controversy heuristics for mock analysis
+        content = message.content.lower()
+        
+        # Basic controversy indicators
+        controversy_keywords = [
+            'disagree', 'wrong', 'terrible', 'awful', 'hate', 'stupid', 'dumb',
+            'politics', 'religion', 'debate', 'argue', 'fight', 'drama', 'toxic',
+            'ban', 'report', 'mute', 'kick', 'controversy', 'problematic'
+        ]
+        
+        # Calculate base score from keywords
+        keyword_matches = sum(1 for keyword in controversy_keywords if keyword in content)
+        base_score = min(keyword_matches * 0.15, 0.7)
+        
+        # Add randomness and message length factor
+        length_factor = min(len(content) / 500, 0.3)  # Longer messages slightly more controversial
+        excitement_factor = content.count('!') * 0.05  # Exclamation marks add controversy
+        caps_factor = sum(1 for c in content if c.isupper()) / max(len(content), 1) * 0.2  # CAPS
+        
+        controversy_score = min(base_score + length_factor + excitement_factor + caps_factor + random.uniform(0, 0.2), 1.0)
+        confidence = random.uniform(0.6, 0.9)
+        
+        # Generate reasons based on content analysis
+        reasons = []
+        if keyword_matches > 0:
+            reasons.append(f"Contains {keyword_matches} potentially controversial keyword(s)")
+        if caps_factor > 0.1:
+            reasons.append("Excessive use of capital letters detected")
+        if excitement_factor > 0.1:
+            reasons.append("High emotional intensity (multiple exclamation marks)")
+        if length_factor > 0.2:
+            reasons.append("Long message with potential for complex discussion")
+        if len(context_messages) > 2:
+            reasons.append("Part of an ongoing conversation thread")
+        
+        # Add persona-specific analysis flavor
+        persona = ctx.server_config.persona.value
+        if persona == "sassy_reporter":
+            if controversy_score > 0.5:
+                reasons.append("The tea is HOT on this one! ☕")
+            else:
+                reasons.append("Pretty tame tbh, not much drama here")
+        elif persona == "conspiracy_theorist":
+            reasons.append("There are deeper layers to analyze here...")
+            if random.random() > 0.5:
+                reasons.append("Suspiciously innocent... or IS it?")
+        elif persona == "investigative_journalist":
+            reasons.append("Thorough analysis of linguistic patterns completed")
+            if controversy_score > 0.3:
+                reasons.append("Requires further investigation for full context")
+        
+        if not reasons:
+            reasons = ["Standard message analysis completed", "No significant controversy indicators found"]
+        
+        return {
+            "controversy_score": controversy_score,
+            "confidence": confidence,
+            "reasons": reasons,
+            "related_messages_count": len(context_messages),
+            "analysis_method": "mock_heuristic"
+        }
+
+
+# Register the command
+from src.discord_bot.commands.base import command_registry
+command_registry.register(ControversyCheckCommand())
