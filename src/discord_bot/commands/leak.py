@@ -35,28 +35,29 @@ class LeakCommand(PublicCommand):
         )
         
         try:
-            # Get Discord client from container
-            settings = ctx.container.get_settings()
-            
-            # Import here to avoid circular imports
-            from src.discord_bot.client import get_discord_client
-            discord_client = await get_discord_client(settings)
-            
-            # Get recently active users from the last hour
+            # Get recent messages directly from Discord channel
             cutoff_time = datetime.now() - timedelta(hours=1)
-            recent_messages = await discord_client.get_recent_messages(
-                channel_id=ctx.channel_id,
-                limit=100,
-                after=cutoff_time
-            )
+            channel = ctx.interaction.client.get_channel(int(ctx.channel_id))
+            if not channel:
+                embed = EmbedBuilder.error(
+                    "Channel Error",
+                    "Could not access the current channel."
+                )
+                await ctx.respond(embed=embed)
+                return
+            
+            # Fetch recent messages from the channel
+            recent_messages = []
+            async for message in channel.history(limit=100, after=cutoff_time):
+                recent_messages.append(message)
             
             # Collect unique active users (excluding bots and the command user)
             active_users = set()
             for msg in recent_messages:
                 # Skip bots and the user who ran the command
-                if (msg.author_id != str(ctx.interaction.client.user.id) and 
-                    msg.author_id != ctx.user_id):
-                    active_users.add(msg.author_id)
+                if (not msg.author.bot and 
+                    str(msg.author.id) != ctx.user_id):
+                    active_users.add(str(msg.author.id))
             
             if not active_users:
                 embed = EmbedBuilder.warning(
@@ -74,7 +75,7 @@ class LeakCommand(PublicCommand):
                 target_user = ctx.guild.get_member(int(target_user_id))
                 if not target_user:
                     # Try to fetch from Discord
-                    target_user = await discord_client.get_user(target_user_id)
+                    target_user = await ctx.interaction.client.fetch_user(int(target_user_id))
                 
                 target_name = target_user.display_name if hasattr(target_user, 'display_name') else target_user.name
                 target_mention = f"<@{target_user_id}>"

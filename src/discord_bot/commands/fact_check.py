@@ -26,6 +26,16 @@ class FactCheckCommand(PublicCommand):
             cooldown_seconds=15  # Moderate cooldown
         )
     
+    def define_parameters(self) -> Dict[str, Dict[str, Any]]:
+        """Define command parameters for Discord slash command."""
+        return {
+            "message_id": {
+                "type": str,
+                "description": "ID of the message to fact-check",
+                "required": True
+            }
+        }
+    
     async def validate_arguments(self, ctx: CommandContext, **kwargs) -> Dict[str, Any]:
         """Validate command arguments."""
         validated = {}
@@ -51,9 +61,8 @@ class FactCheckCommand(PublicCommand):
         
         return validated
     
-    async def execute(self, ctx: CommandContext, **kwargs) -> None:
+    async def execute(self, ctx: CommandContext, message_id: str) -> None:
         """Execute the fact-check command."""
-        message_id = kwargs['message_id']
         
         logger.info(
             "Fact-check command executed",
@@ -64,17 +73,19 @@ class FactCheckCommand(PublicCommand):
         )
         
         try:
-            # Get Discord client from container
-            settings = ctx.container.get_settings()
-            
-            # Import here to avoid circular imports
-            from src.discord_bot.client import get_discord_client
-            discord_client = await get_discord_client(settings)
-            
-            # Get the target message
-            target_message = await discord_client.get_message(ctx.channel_id, message_id)
-            
-            if not target_message:
+            # Get the target message directly from Discord
+            channel = ctx.interaction.client.get_channel(int(ctx.channel_id))
+            if not channel:
+                embed = EmbedBuilder.error(
+                    "Channel Error",
+                    "Could not access the current channel."
+                )
+                await ctx.respond(embed=embed, ephemeral=True)
+                return
+                
+            try:
+                target_message = await channel.fetch_message(int(message_id))
+            except discord.NotFound:
                 embed = EmbedBuilder.warning(
                     "Message Not Found",
                     f"Could not find message with ID `{message_id}` in this channel."
@@ -83,7 +94,7 @@ class FactCheckCommand(PublicCommand):
                 return
             
             # Don't fact-check bot messages
-            if target_message.author_id == str(ctx.interaction.client.user.id):
+            if target_message.author.bot or str(target_message.author.id) == str(ctx.interaction.client.user.id):
                 embed = EmbedBuilder.warning(
                     "Cannot Fact-Check Bot",
                     "I don't fact-check my own messages. That would be weird. 🤖"

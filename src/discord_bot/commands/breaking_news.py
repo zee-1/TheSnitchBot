@@ -24,6 +24,27 @@ class BreakingNewsCommand(PublicCommand):
             cooldown_seconds=30  # Higher cooldown for AI operations
         )
     
+    def define_parameters(self) -> Dict[str, Dict[str, Any]]:
+        """Define command parameters for Discord slash command."""
+        return {
+            "message_count": {
+                "type": int,
+                "description": "Number of recent messages to analyze for breaking news (10-100)",
+                "required": False,
+                "default": 50,
+                "min_value": 10,
+                "max_value": 100
+            },
+            "time_window": {
+                "type": int,
+                "description": "Hours of message history to analyze (1-24)",
+                "required": False,
+                "default": 2,
+                "min_value": 1,
+                "max_value": 24
+            }
+        }
+    
     async def validate_arguments(self, ctx: CommandContext, **kwargs) -> Dict[str, Any]:
         """Validate command arguments."""
         validated = {}
@@ -42,10 +63,8 @@ class BreakingNewsCommand(PublicCommand):
         
         return validated
     
-    async def execute(self, ctx: CommandContext, **kwargs) -> None:
+    async def execute(self, ctx: CommandContext, message_count: int = 50, time_window: int = 2) -> None:
         """Execute the breaking news command."""
-        message_count = kwargs['message_count']
-        time_window = kwargs['time_window']
         
         logger.info(
             "Breaking news command executed",
@@ -60,20 +79,22 @@ class BreakingNewsCommand(PublicCommand):
         await ctx.defer()
         
         try:
-            # Get Discord client from container
-            settings = ctx.container.get_settings()
-            
-            # Import here to avoid circular imports
-            from src.discord_bot.client import get_discord_client
-            discord_client = await get_discord_client(settings)
-            
-            # Get recent messages from current channel
+            # Get recent messages directly from Discord channel
             cutoff_time = datetime.now() - timedelta(hours=time_window)
-            messages = await discord_client.get_recent_messages(
-                channel_id=ctx.channel_id,
-                limit=message_count,
-                after=cutoff_time
-            )
+            channel = ctx.interaction.client.get_channel(int(ctx.channel_id))
+            if not channel:
+                embed = EmbedBuilder.error(
+                    "Channel Error",
+                    "Could not access the current channel."
+                )
+                await ctx.respond(embed=embed)
+                return
+            
+            # Fetch recent messages from the channel
+            messages = []
+            async for message in channel.history(limit=message_count, after=cutoff_time):
+                if not message.author.bot and message.content.strip():
+                    messages.append(message)
             
             if len(messages) < 5:
                 embed = EmbedBuilder.warning(
@@ -84,11 +105,10 @@ class BreakingNewsCommand(PublicCommand):
                 await ctx.respond(embed=embed)
                 return
             
-            # Filter out bot messages and very short messages
+            # Filter out very short messages (bot messages already filtered)
             filtered_messages = [
                 msg for msg in messages 
-                if not msg.author_id == str(ctx.interaction.client.user.id)
-                and len(msg.content.strip()) > 10
+                if len(msg.content.strip()) > 10
             ]
             
             if len(filtered_messages) < 3:
@@ -106,7 +126,7 @@ class BreakingNewsCommand(PublicCommand):
                 ai_service = await get_ai_service()
                 
                 # Use mock responses if enabled in settings
-                if settings.mock_ai_responses:
+                if ctx.settings.mock_ai_responses:
                     bulletin = await self._generate_mock_bulletin(filtered_messages, ctx)
                 else:
                     # Generate smart breaking news using AI service
@@ -172,7 +192,7 @@ class BreakingNewsCommand(PublicCommand):
         
         # Simple mock implementation
         total_messages = len(messages)
-        unique_users = len(set(msg.author_id for msg in messages))
+        unique_users = len(set(str(msg.author.id) for msg in messages))
         
         # Find most active topic (simple keyword analysis)
         word_counts = {}
@@ -184,11 +204,11 @@ class BreakingNewsCommand(PublicCommand):
         
         top_words = sorted(word_counts.items(), key=lambda x: x[1], reverse=True)[:3]
         
-        # Get most controversial message
-        most_controversial = max(messages, key=lambda x: x.controversy_score) if messages else None
+        # Get most engaging message (by length as proxy for controversy)
+        most_controversial = max(messages, key=lambda x: len(x.content)) if messages else None
         
         # Generate mock bulletin based on persona
-        persona = ctx.server_config.persona.value
+        persona = ctx.server_config.persona
         
         if persona == "sassy_reporter":
             bulletin = f"**BREAKING:** Drama alert in #{ctx.channel.name}! 🍵\n\n"
