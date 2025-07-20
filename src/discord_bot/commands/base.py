@@ -66,20 +66,19 @@ class CommandContext:
     ) -> None:
         """Respond to the interaction."""
         try:
+            # Only include view parameter if it's not None
+            kwargs = {
+                "content": content,
+                "embed": embed,
+                "ephemeral": ephemeral
+            }
+            if view is not None:
+                kwargs["view"] = view
+                
             if self.interaction.response.is_done():
-                await self.interaction.followup.send(
-                    content=content,
-                    embed=embed,
-                    ephemeral=ephemeral,
-                    view=view
-                )
+                await self.interaction.followup.send(**kwargs)
             else:
-                await self.interaction.response.send_message(
-                    content=content,
-                    embed=embed,
-                    ephemeral=ephemeral,
-                    view=view
-                )
+                await self.interaction.response.send_message(**kwargs)
         except Exception as e:
             logger.error(f"Failed to respond to interaction: {e}")
             raise DiscordError(f"Failed to respond: {e}")
@@ -87,7 +86,8 @@ class CommandContext:
     async def defer(self, ephemeral: bool = False) -> None:
         """Defer the interaction response."""
         try:
-            await self.interaction.response.defer(ephemeral=ephemeral)
+            if not self.interaction.response.is_done():
+                await self.interaction.response.defer(ephemeral=ephemeral)
         except Exception as e:
             logger.error(f"Failed to defer interaction: {e}")
             raise DiscordError(f"Failed to defer: {e}")
@@ -456,10 +456,30 @@ class CommandRegistry:
     ) -> None:
         """Create Discord app command from BaseCommand."""
         
+        # Get parameters if defined
+        parameters = {}
+        if hasattr(command, 'define_parameters'):
+            try:
+                param_defs = command.define_parameters()
+                for param_name, param_info in param_defs.items():
+                    param_type = param_info.get('type', str)
+                    description = param_info.get('description', f'{param_name} parameter')
+                    required = param_info.get('required', False)
+                    
+                    # Convert to app_commands parameter
+                    if param_type == int:
+                        min_value = param_info.get('min_value')
+                        max_value = param_info.get('max_value')
+                        parameters[param_name] = app_commands.describe(**{param_name: description})
+                    else:
+                        parameters[param_name] = app_commands.describe(**{param_name: description})
+            except Exception as e:
+                logger.warning(f"Failed to process parameters for {command.name}: {e}")
+        
         async def command_callback(interaction: discord.Interaction, **kwargs):
             await command.handle_command(interaction, container, **kwargs)
         
-        # Create the app command
+        # Create the app command with parameters
         app_command = app_commands.Command(
             name=command.name,
             description=command.description,
