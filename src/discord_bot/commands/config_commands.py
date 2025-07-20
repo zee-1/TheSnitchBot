@@ -60,7 +60,7 @@ class SetPersonaCommand(AdminCommand):
             "Set persona command executed",
             user_id=ctx.user_id,
             guild_id=ctx.guild_id,
-            new_persona=persona.value
+            new_persona=persona
         )
         
         try:
@@ -71,7 +71,7 @@ class SetPersonaCommand(AdminCommand):
             if success:
                 embed = EmbedBuilder.success(
                     "Persona Updated",
-                    f"Bot persona changed to **{persona.value.replace('_', ' ').title()}**! 🎭\n\n"
+                    f"Bot persona changed to **{persona.replace('_', ' ').title()}**! 🎭\n\n"
                     f"The newsletter and commands will now use this personality."
                 )
                 
@@ -366,7 +366,7 @@ class ServerStatusCommand(AdminCommand):
             # Basic info
             embed.add_field(
                 name="🎭 Current Persona",
-                value=server_config.persona.value.replace('_', ' ').title(),
+                value=server_config.persona.replace('_', ' ').title(),
                 inline=True
             )
             

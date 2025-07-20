@@ -48,7 +48,7 @@ class LeakCommand(PublicCommand):
             
             # Fetch recent messages from the channel
             recent_messages = []
-            async for message in channel.history(limit=100, after=cutoff_time):
+            async for message in channel.history(limit=100):
                 recent_messages.append(message)
             
             # Collect unique active users (excluding bots and the command user)
@@ -91,6 +91,8 @@ class LeakCommand(PublicCommand):
                 else:
                     # Use Groq AI for personalized leaks
                     leak_content = await self._generate_ai_leak(target_name, target_user_id, ctx, recent_messages)
+                    from pprint import pprint
+                    pprint(leak_content)
             except Exception as ai_error:
                 logger.warning(f"AI leak generation failed, falling back to mock: {ai_error}")
                 leak_content = self._generate_mock_leak(target_name, ctx.server_config.persona, recent_messages)
@@ -174,16 +176,17 @@ class LeakCommand(PublicCommand):
             # Build context for AI
             context_info = {
                 "target_name": target_name,
-                "target_messages": target_messages[-5:],  # Last 5 messages from target
-                "other_users": dict(list(other_users.items())[:3]),  # Top 3 other active users
+                "target_messages": target_messages[-10:],  # Last 5 messages from target
+                "other_users": dict(list(other_users.items())[:10]),  # Top 3 other active users
                 "server_name": ctx.interaction.guild.name if ctx.interaction.guild else "this server",
-                "persona": ctx.server_config.persona.value
+               "persona": ctx.server_config.persona
             }
             
             # Create AI prompt for leak generation
             prompt = f"""Create a humorous, harmless "leak" about {target_name} for a Discord server gossip bot called "The Snitch". 
 
 IMPORTANT GUIDELINES:
+- can be maximum 4096 character long. containing 20-30 words at MAX.
 - Keep it completely innocent and fun
 - No sexual content, no cussing, no inappropriate material
 - Make it embarrassing but harmless (like silly habits, funny moments, etc.)
@@ -191,7 +194,6 @@ IMPORTANT GUIDELINES:
 - Base it on recent chat patterns if possible
 - Include other server members if it makes the leak funnier
 - Make it sound like genuine gossip but obviously fake
-- Length: 1-2 sentences maximum
 
 PERSONA STYLE: {context_info['persona']} 
 - sassy_reporter: dramatic, gossipy, uses "tea" and drama language
@@ -212,28 +214,38 @@ Generate a single entertaining leak that could involve gossip about:
 - Embarrassing but innocent moments
 - Social interactions with other members
 - Pop culture obsessions or guilty pleasures
+example - 'sliding into DMs about', 'obsessing over', 'secretly judging people who dont like', 'writing love letters to', 'dreaming about','maintains a secret alliance with', 'has been exchanging coded messages with', 'shares classified intel with', 'plots world domination with', 'practices synchronized activities with'
+'carrying good luck charms for', 'performing pre-game rituals involving', 'coaching others in the art of', 'holding secret training sessions for', 'establishing dominance in'
+'obsessing over', 'writing poetry about', 'creating elaborate theories involving', 'collecting rare items related to', 'practicing rituals centered around'
+Make it server-specific and personalized based on the context provided.
 
-Make it server-specific and personalized based on the context provided."""
+AI Output:
+XYZ Found playing with barbie in local park, police investigating.
 
+"""
             # Get AI response
-            leak_content = await ai_service.groq_client.analyze_content(
-                content=prompt,
-                analysis_type="creative_writing",
-                context=f"Discord server leak generation for {context_info['server_name']}"
+        #     content: str,
+        # analysis_type: str,
+        # context: Optional[str] = None,
+        # model: Optional[str] = None
+            leak_content = await ai_service.groq_client.simple_completion(
+                prompt=prompt,
+                temperature=0.4,
+                max_tokens=150
             )
             
             # Clean up the response and ensure it's appropriate length
             leak_content = leak_content.strip()
-            if len(leak_content) > 300:
+            if len(leak_content) > 4096:
                 # Truncate if too long
-                leak_content = leak_content[:297] + "..."
+                leak_content = leak_content[:4090] + "..."
                 
             return leak_content
             
         except Exception as e:
             logger.error(f"AI leak generation failed: {e}")
             # Fallback to mock
-            return self._generate_mock_leak(target_name, ctx.server_config.persona.value, recent_messages)
+            return self._generate_mock_leak(target_name, ctx.server_config.persona, recent_messages)
     
     def _generate_mock_leak(self, target_name: str, persona: str, recent_messages: list) -> str:
         """Generate a humorous fake leak about a user with some personalization."""
@@ -260,8 +272,8 @@ Make it server-specific and personalized based on the context provided."""
         
         leak_templates = {
             'sassy_reporter': [
-                f"Tea has been SPILLED! 🍵 {target_name} was caught {random.choice(['sliding into DMs about', 'obsessing over', 'secretly judging people who don\'t like', 'writing love letters to', 'dreaming about'])} {topic}. The dedication is real! 💅",
-                f"BREAKING: Multiple sources confirm {target_name} {random.choice(['has a secret crush on', 'starts arguments with', 'gets way too competitive with', 'sends memes to at 3AM', 'practices pickup lines on'])} {other_user}. We\'re here for this drama! 😱",
+                f"Tea has been SPILLED! 🍵 {target_name} was caught {random.choice(['sliding into DMs about', 'obsessing over', 'secretly judging people who dont like', 'writing love letters to', 'dreaming about'])} {topic}. The dedication is real! 💅",
+                f"BREAKING: Multiple sources confirm {target_name} {random.choice(['has a secret crush on', 'starts arguments with', 'gets way too competitive with', 'sends memes to at 3AM', 'practices pickup lines on'])} {other_user}. Were here for this drama! 😱",
                 f"Exclusive scoop: {target_name} allegedly {random.choice(['cried watching', 'spent their rent money on', 'stays up all night thinking about', 'has strong opinions about', 'writes fanfiction involving'])} {topic}. No shame in that game, hun! 💁‍♀️",
                 f"Sources say {target_name} once {random.choice(['embarrassed themselves in front of', 'tried to impress', 'got roasted by', 'accidentally confessed their love to', 'challenged to a duel'])} {other_user} over {topic}. The secondhand embarrassment! 🤭"
             ],

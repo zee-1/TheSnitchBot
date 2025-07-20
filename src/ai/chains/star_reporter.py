@@ -64,7 +64,7 @@ class StarReporterChain:
             {article_context}
             
             WRITING REQUIREMENTS:
-            - Write as a {persona.value.replace('_', ' ')} personality
+            - Write as a {persona.replace('_', ' ')} personality
             - Include actual quotes from messages (but anonymize usernames)
             - Make it 200-400 words
             - Include engaging headline and conclusion
@@ -89,7 +89,7 @@ class StarReporterChain:
                 "Newsletter article written",
                 headline=selected_story.get("headline", "Unknown"),
                 article_length=len(processed_article),
-                persona=persona.value,
+                persona=persona,
                 source_messages=len(source_messages)
             )
             
@@ -194,7 +194,7 @@ class StarReporterChain:
         if len(processed) < 100:
             # Article too short, add filler content
             processed += f"\n\nThis story continues to develop as community discussions evolve. "
-            processed += f"The {persona.value.replace('_', ' ')} will keep monitoring the situation!"
+            processed += f"The {persona.replace('_', ' ')} will keep monitoring the situation!"
         
         elif len(processed) > 2000:
             # Article too long, truncate gracefully
@@ -285,7 +285,7 @@ class StarReporterChain:
             Write a 2-3 sentence breaking news bulletin that:
             - Starts with "🚨 BREAKING:" or similar
             - Summarizes the most significant recent event/topic
-            - Uses your {persona.value.replace('_', ' ')} voice
+            - Uses your {persona.replace('_', ' ')} voice
             - Includes relevant emojis
             - Makes it feel urgent and newsworthy
             

@@ -136,7 +136,7 @@ class ServerRepository(BaseRepository[ServerConfig]):
             server_config.persona = persona
             await self.update(server_config)
             
-            logger.info(f"Updated persona for server {server_id}: {persona.value}")
+            logger.info(f"Updated persona for server {server_id}: {persona}")
             return True
             
         except Exception as e:
@@ -262,7 +262,7 @@ class ServerRepository(BaseRepository[ServerConfig]):
         """Get servers using a specific persona."""
         query = "SELECT * FROM c WHERE c.persona = @persona AND c.status = @status"
         parameters = [
-            {"name": "@persona", "value": persona.value},
+            {"name": "@persona", "value": persona},
             {"name": "@status", "value": ServerStatus.ACTIVE.value}
         ]
         
@@ -282,8 +282,8 @@ class ServerRepository(BaseRepository[ServerConfig]):
             # Count by persona
             persona_stats = {}
             for persona in PersonaType:
-                count = await self.count(where_clause=f"c.persona = '{persona.value}'")
-                persona_stats[persona.value] = count
+                count = await self.count(where_clause=f"c.persona = '{persona}'")
+                persona_stats[persona] = count
             
             return {
                 "total_servers": active_count + inactive_count + suspended_count,

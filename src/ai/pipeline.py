@@ -75,11 +75,11 @@ class NewsletterPipeline:
                 server_id=server_config.server_id,
                 total_messages=len(messages),
                 filtered_messages=len(filtered_messages),
-                persona=server_config.persona.value
+                persona=server_config.persona
             )
             
             # Update newsletter status
-            newsletter.start_generation(server_config.persona.value)
+            newsletter.start_generation(server_config.persona)
             newsletter.analyzed_messages_count = len(filtered_messages)
             
             # CHAIN A: News Desk - Identify potential stories
@@ -127,7 +127,7 @@ class NewsletterPipeline:
                 engagement_score=selected_story.get("total_engagement", 0.0),
                 relevance_score=selected_story.get("story_score", 0.0),
                 generated_by_chain="full_pipeline",
-                generation_prompt=f"Generated using {server_config.persona.value} persona",
+                generation_prompt=f"Generated using {server_config.persona} persona",
                 generation_timestamp=datetime.now()
             )
             
@@ -199,7 +199,7 @@ class NewsletterPipeline:
             logger.info(
                 "Breaking news generated",
                 message_count=len(messages),
-                persona=persona.value,
+                persona=persona,
                 bulletin_length=len(bulletin)
             )
             
@@ -306,7 +306,7 @@ class NewsletterPipeline:
         
         context = {
             "server_name": server_config.server_name,
-            "persona": server_config.persona.value,
+            "persona": server_config.persona,
             "features_enabled": {
                 "breaking_news": server_config.breaking_news_enabled,
                 "fact_check": server_config.fact_check_enabled,

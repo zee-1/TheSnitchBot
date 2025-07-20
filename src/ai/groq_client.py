@@ -329,7 +329,9 @@ class GroqClient:
             return result
         
         except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse analysis JSON: {e}, response: {response}")
+            # Safely log without Unicode issues
+            response_preview = response[:100] if response else "<empty>"
+            logger.error(f"Failed to parse analysis JSON: {str(e)}, response preview: {repr(response_preview)}")
             # Return default values
             return {
                 f"{analysis_type}_score": 0.0,

@@ -64,7 +64,7 @@ class EditorChiefChain:
             - Which story will most engage this server's community?
             - Which has the best combination of entertainment value and relevance?
             - Which will generate the most positive discussion?
-            - Which fits best with the {persona.value.replace('_', ' ')} persona?
+            - Which fits best with the {persona.replace('_', ' ')} persona?
             
             Select ONE story and explain your editorial decision.
             """
@@ -87,7 +87,7 @@ class EditorChiefChain:
                 "Editorial selection completed",
                 selected_headline=editorial_story.get("headline", "Unknown"),
                 total_candidates=len(story_candidates),
-                persona=persona.value,
+                persona=persona,
                 story_score=editorial_story.get("story_score", 0)
             )
             

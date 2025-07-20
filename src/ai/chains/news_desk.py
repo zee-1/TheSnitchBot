@@ -89,7 +89,7 @@ class NewsDeskChain:
                 "News desk analysis completed",
                 message_count=len(messages),
                 stories_identified=len(enriched_stories),
-                persona=persona.value
+                persona=persona
             )
             
             return enriched_stories[:max_stories]
