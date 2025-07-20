@@ -7,7 +7,7 @@ import discord
 from typing import Dict, Any
 from datetime import datetime, timedelta
 
-from src.discord.commands.base import PublicCommand, CommandContext, EmbedBuilder
+from src.discord_bot.commands.base import PublicCommand, CommandContext, EmbedBuilder
 from src.core.exceptions import InsufficientContentError, AIServiceError
 from src.core.logging import get_logger
 
@@ -64,7 +64,7 @@ class BreakingNewsCommand(PublicCommand):
             settings = ctx.container.get_settings()
             
             # Import here to avoid circular imports
-            from src.discord.client import get_discord_client
+            from src.discord_bot.client import get_discord_client
             discord_client = await get_discord_client(settings)
             
             # Get recent messages from current channel
@@ -243,3 +243,8 @@ class BreakingNewsCommand(PublicCommand):
             bulletin += "\n\nStay informed with The Snitch!"
         
         return bulletin
+
+
+# Register the command
+from src.discord_bot.commands.base import command_registry
+command_registry.register(BreakingNewsCommand())

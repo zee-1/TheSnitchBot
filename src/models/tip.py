@@ -6,7 +6,7 @@ Handles anonymous tip submissions and processing.
 from datetime import datetime
 from typing import Optional, Dict, Any
 from enum import Enum
-from pydantic import Field, validator
+from pydantic import Field, field_validator, ConfigDict
 from .base import CosmosDBEntity
 
 
@@ -75,7 +75,16 @@ class Tip(CosmosDBEntity):
     resolution_notes: str = Field("", description="Resolution summary")
     resulted_in_newsletter: bool = Field(False, description="Whether tip led to newsletter story")
     
-    @validator("content")
+    def __init__(self, **data):
+        """Initialize Tip with proper entity_type and partition_key."""
+        if 'entity_type' not in data:
+            data['entity_type'] = 'tip'
+        if 'partition_key' not in data and 'server_id' in data:
+            data['partition_key'] = data['server_id']
+        super().__init__(**data)
+    
+    @field_validator("content")
+    @classmethod
     def validate_content(cls, v):
         """Validate tip content."""
         if not v.strip():
@@ -84,7 +93,8 @@ class Tip(CosmosDBEntity):
             raise ValueError("Tip content cannot exceed 2000 characters")
         return v.strip()
     
-    @validator("ai_relevance_score")
+    @field_validator("ai_relevance_score")
+    @classmethod
     def validate_relevance_score(cls, v):
         """Validate AI relevance score range."""
         if not 0 <= v <= 1:
@@ -124,13 +134,14 @@ class Tip(CosmosDBEntity):
         """Mark tip as reviewed."""
         self.status = TipStatus.REVIEWED
         if notes:
-            self.investigation_notes += f"\n[{datetime.now()}] {notes}"
+            timestamp_str = datetime.now().isoformat()
+            self.investigation_notes += f"\n[{timestamp_str}] {notes}"
         self.update_timestamp()
     
     def mark_processed(self, resolution: str, resulted_in_newsletter: bool = False) -> None:
         """Mark tip as processed with resolution."""
         self.status = TipStatus.PROCESSED
-        self.resolved_at = datetime.now()
+        self.resolved_at = datetime.now().isoformat()
         self.resolution_notes = resolution
         self.resulted_in_newsletter = resulted_in_newsletter
         self.update_timestamp()
@@ -138,14 +149,14 @@ class Tip(CosmosDBEntity):
     def dismiss_tip(self, reason: str) -> None:
         """Dismiss tip with reason."""
         self.status = TipStatus.DISMISSED
-        self.resolved_at = datetime.now()
+        self.resolved_at = datetime.now().isoformat()
         self.resolution_notes = f"Dismissed: {reason}"
         self.update_timestamp()
     
     def add_investigation_note(self, note: str, user_id: str = "system") -> None:
         """Add investigation note."""
-        timestamp = datetime.now()
-        self.investigation_notes += f"\n[{timestamp}] {user_id}: {note}"
+        timestamp_str = datetime.now().isoformat()
+        self.investigation_notes += f"\n[{timestamp_str}] {user_id}: {note}"
         self.update_timestamp()
     
     def add_related_message(self, message_id: str) -> None:

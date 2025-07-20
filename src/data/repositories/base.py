@@ -5,7 +5,7 @@ Provides common CRUD operations for Cosmos DB entities.
 
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, TypeVar, Generic, Type
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 
 from src.models.base import CosmosDBEntity
@@ -29,7 +29,7 @@ class BaseRepository(ABC, Generic[T]):
         try:
             # Ensure timestamps are set
             if not entity.created_at:
-                entity.created_at = datetime.now()
+                entity.created_at = datetime.now().strftime()
             
             # Convert to dict for Cosmos DB
             item_dict = entity.to_cosmos_dict()
@@ -53,12 +53,16 @@ class BaseRepository(ABC, Generic[T]):
     async def get_by_id(self, entity_id: str, partition_key: str) -> Optional[T]:
         """Get entity by ID and partition key."""
         try:
+            print("==========FETCHING FOR==========")
+            print("Container:",self.container_name)
+            print("Item:",entity_id)
+            print("Partition:",partition_key)
             result = await self.cosmos_client.read_item(
                 container_name=self.container_name,
                 item_id=entity_id,
                 partition_key=partition_key
             )
-            
+            print("==== Fetch result",result)
             if result:
                 entity = self.model_class.from_cosmos_dict(result)
                 logger.debug(f"Retrieved {self.model_class.__name__} with ID: {entity_id}")
@@ -69,7 +73,34 @@ class BaseRepository(ABC, Generic[T]):
         except Exception as e:
             logger.error(f"Failed to get {self.model_class.__name__} by ID {entity_id}: {e}")
             raise
+
     
+    async def get_by_partition(self, partition_key: str) -> Optional[T]:
+        """Get entity by ID and partition key."""
+        try:
+            print("==========FETCHING FOR==========")
+            print("Container:",self.container_name)
+            
+            rows = await self.cosmos_client.get_items_by_partition(container_name=self.container_name,partition_key=partition_key)
+            entity_id = rows[0]['id']
+
+            print("Item:",entity_id)
+            print("Partition:",partition_key)
+            result = await self.cosmos_client.read_item(
+                container_name=self.container_name,
+                item_id=entity_id,
+                partition_key=partition_key
+            )
+            if result:
+                entity = self.model_class.from_cosmos_dict(result)
+                logger.debug(f"Retrieved {self.model_class.__name__} with ID: {entity_id}")
+                return entity
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Failed to get {self.model_class.__name__} by ID {entity_id}: {e}")
+            raise
     async def update(self, entity: T) -> T:
         """Update an existing entity."""
         try:
@@ -232,8 +263,8 @@ class BaseRepository(ABC, Generic[T]):
     async def find_by_date_range(
         self,
         date_field: str,
-        start_date: datetime,
-        end_date: datetime,
+        start_date: str,
+        end_date: str,
         partition_key: Optional[str] = None,
         max_count: Optional[int] = None
     ) -> List[T]:
@@ -309,4 +340,3 @@ class BaseRepository(ABC, Generic[T]):
             raise
 
 
-from datetime import timedelta

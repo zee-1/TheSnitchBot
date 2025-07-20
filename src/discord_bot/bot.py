@@ -4,6 +4,8 @@ Handles Discord events, message processing, and command registration.
 """
 
 import discord
+from discord import app_commands
+
 from discord.ext import commands, tasks
 import asyncio
 import logging
@@ -14,10 +16,16 @@ from src.core.config import get_settings
 from src.core.dependencies import DependencyContainer
 from src.core.exceptions import BotInitializationError, MessageProcessingError
 from src.core.logging import get_logger, setup_logging
-from src.discord.client import DiscordClient
-from src.discord.commands.base import command_registry
+from src.discord_bot.client import SnitchDiscordClient
+from src.discord_bot.commands.base import command_registry
+# Import command modules to trigger registration
+import src.discord_bot.commands.config_commands
+import src.discord_bot.commands.breaking_news
+import src.discord_bot.commands.fact_check
+import src.discord_bot.commands.leak
+import src.discord_bot.commands.help_command
 from src.models.server import ServerConfig, PersonaType
-from src.models.message import Message, MessageReaction
+from src.models.message import Message, ReactionData
 from src.ai import get_ai_service
 
 logger = get_logger(__name__)
@@ -41,12 +49,12 @@ class SnitchBot(commands.Bot):
         
         self.settings = get_settings()
         self.container: Optional[DependencyContainer] = None
-        self.discord_client: Optional[DiscordClient] = None
+        self.discord_client: Optional[SnitchDiscordClient] = None
         self.ai_service = None
         self.server_configs: Dict[str, ServerConfig] = {}
         self.processing_queue = asyncio.Queue()
         self.is_ready = False
-        
+         
     async def setup_hook(self):
         """Called when the bot is starting up."""
         logger.info("Setting up The Snitch Discord Bot...")
@@ -57,9 +65,8 @@ class SnitchBot(commands.Bot):
             await self.container.initialize()
             
             # Initialize Discord client wrapper
-            from src.discord.client import get_discord_client
+            from src.discord_bot.client import get_discord_client
             self.discord_client = await get_discord_client(self.settings)
-            
             # Initialize AI service
             self.ai_service = await get_ai_service()
             
@@ -147,66 +154,63 @@ class SnitchBot(commands.Bot):
         """Register all slash commands with Discord."""
         logger.info("Registering slash commands...")
         
-        registered_commands = []
+        # Register proper config commands with parameters
+        from src.discord_bot.commands.config_app_commands import setup_config_commands
+        config_group = setup_config_commands(self, self.container)
+        logger.info("Registered config command group")
         
-        for command_class in command_registry.get_all_commands():
+        # Register simple commands without parameters
+        all_commands = command_registry.get_all_commands()
+        logger.info(f"Found {len(all_commands)} simple commands to register")
+        
+        registered_commands = ["config"]  # Config group already added
+        
+        for command_instance in all_commands:
             try:
-                # Create command instance
-                cmd_instance = command_class()
+                # Skip config commands as they're handled by the app command group
+                if command_instance.name.startswith("set-") or command_instance.name == "bot-status":
+                    logger.info(f"Skipping {command_instance.name} (handled by config group)")
+                    continue
+                    
+                logger.info(f"Registering command: {command_instance.name}")
                 
-                # Create Discord slash command
-                slash_cmd = discord.app_commands.Command(
-                    name=cmd_instance.name,
-                    description=cmd_instance.description,
-                    callback=self._create_command_callback(cmd_instance)
+                # Create a simple command without parameters
+                def make_callback(cmd_inst):
+                    async def simple_callback(interaction: discord.Interaction):
+                        await cmd_inst.handle_command(interaction, self.container)
+                    return simple_callback
+                
+                slash_cmd = app_commands.Command(
+                    name=command_instance.name,
+                    description=command_instance.description,
+                    callback=make_callback(command_instance)
                 )
                 
                 # Add to command tree
                 self.tree.add_command(slash_cmd)
-                registered_commands.append(cmd_instance.name)
+                registered_commands.append(command_instance.name)
+                logger.info(f"Successfully registered command: {command_instance.name}")
                 
             except Exception as e:
-                logger.error(f"Failed to register command {command_class.__name__}: {e}")
+                logger.error(f"Failed to register command {command_instance.name}: {e}", exc_info=True)
+        
+        logger.info(f"Registered {len(registered_commands)} commands locally: {registered_commands}")
         
         # Sync commands with Discord
         try:
+            logger.info("Syncing commands with Discord...")
             synced = await self.tree.sync()
-            logger.info(f"Synced {len(synced)} slash commands: {registered_commands}")
+            logger.info(f"Successfully synced {len(synced)} slash commands with Discord")
+            logger.info(f"Synced commands: {[cmd.name for cmd in synced]}")
         except Exception as e:
-            logger.error(f"Failed to sync commands with Discord: {e}")
+            logger.error(f"Failed to sync commands with Discord: {e}", exc_info=True)
+            raise
     
     def _create_command_callback(self, command_instance):
         """Create a callback function for a slash command."""
-        async def callback(interaction: discord.Interaction, **kwargs):
-            try:
-                # Get server configuration
-                server_config = self.server_configs.get(str(interaction.guild_id))
-                if not server_config:
-                    server_config = await self._create_default_server_config(
-                        interaction.guild_id, 
-                        interaction.guild.name
-                    )
-                
-                # Create command context
-                from src.discord.commands.base import CommandContext
-                ctx = CommandContext(
-                    interaction=interaction,
-                    container=self.container,
-                    server_config=server_config
-                )
-                
-                # Execute command
-                await command_instance.handle(ctx, **kwargs)
-                
-            except Exception as e:
-                logger.error(f"Command {command_instance.name} failed: {e}", exc_info=True)
-                
-                # Send error response if not already responded
-                if not interaction.response.is_done():
-                    await interaction.response.send_message(
-                        "❌ An error occurred while processing your command. Please try again later.",
-                        ephemeral=True
-                    )
+        async def callback(interaction: discord.Interaction):
+            # Use the base command's handle_command method which has proper error handling
+            await command_instance.handle_command(interaction, self.container)
         
         return callback
     
@@ -220,7 +224,7 @@ class SnitchBot(commands.Bot):
             
             for guild in self.guilds:
                 try:
-                    config = await server_repo.get_by_server_id(str(guild.id))
+                    config = await server_repo.get_by_server_id_partition(str(guild.id))
                     if config:
                         self.server_configs[str(guild.id)] = config
                     else:
@@ -242,14 +246,19 @@ class SnitchBot(commands.Bot):
         try:
             server_repo = self.container.get_server_repository()
             
+            # Get guild object to access owner_id
+            guild = self.get_guild(guild_id)
+            owner_id = str(guild.owner_id) if guild and guild.owner_id else "0"
+            
             config = ServerConfig(
                 server_id=str(guild_id),
                 server_name=guild_name,
+                owner_id=owner_id,
                 persona=PersonaType.SASSY_REPORTER,  # Default persona
                 newsletter_enabled=True,
                 newsletter_channel_id=None,  # Will be set by admin
                 newsletter_time="09:00",
-                timezone="UTC"
+                newsletter_timezone="UTC"
             )
             
             # Save to database
@@ -264,9 +273,12 @@ class SnitchBot(commands.Bot):
         except Exception as e:
             logger.error(f"Failed to create default config for guild {guild_id}: {e}")
             # Return minimal config for bot to function
+            guild = self.get_guild(guild_id)
+            owner_id = str(guild.owner_id) if guild and guild.owner_id else "0"
             return ServerConfig(
                 server_id=str(guild_id),
                 server_name=guild_name,
+                owner_id=owner_id,
                 persona=PersonaType.SASSY_REPORTER
             )
     
@@ -419,7 +431,13 @@ class SnitchBot(commands.Bot):
             msg_model = await message_repo.get_by_message_id(str(reaction.message.id))
             if msg_model:
                 # Add reaction to model
-                reaction_model = MessageReaction(
+                reaction_model = ReactionData(
+                    message_id=str(reaction.message.id),
+                    channel_id=str(reaction.message.channel.id),
+                    server_id=str(reaction.message.guild.id),
+                    author_id=str(user.id),
+                    content=str(reaction.emoji),
+                    timestamp=reaction.message.created_at.isoformat(),
                     emoji=str(reaction.emoji),
                     count=reaction.count,
                     users=[str(user.id) for user in await reaction.users().flatten()]
@@ -468,7 +486,7 @@ class SnitchBot(commands.Bot):
             channel_id=str(message.channel.id),
             author_id=str(message.author.id),
             content=message.content,
-            timestamp=message.created_at,
+            timestamp=message.created_at.isoformat(),
             reactions=[],  # Will be updated by reaction events
             reply_count=0,  # Discord doesn't provide this directly
             attachments=[att.url for att in message.attachments],
@@ -602,10 +620,10 @@ def get_bot() -> SnitchBot:
 
 async def run_bot():
     """Run the Discord bot."""
-    setup_logging()
-    
     try:
         settings = get_settings()
+        setup_logging(settings)
+        
         bot_instance = get_bot()
         
         logger.info("Starting The Snitch Discord Bot...")

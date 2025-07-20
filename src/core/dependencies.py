@@ -56,28 +56,28 @@ class DependencyContainer:
         if not self._cosmos_client:
             raise RuntimeError("Cosmos DB client not initialized")
         
-        # Server repository
+        # Server repository - uses operational_data container
         self._instances['server_repository'] = ServerRepository(
             cosmos_client=self._cosmos_client,
-            container_name=self._settings.cosmos_container_servers
+            container_name=self._settings.cosmos_container_operational
         )
         
-        # Tip repository
+        # Tip repository - uses operational_data container
         self._instances['tip_repository'] = TipRepository(
             cosmos_client=self._cosmos_client,
-            container_name=self._settings.cosmos_container_tips
+            container_name=self._settings.cosmos_container_operational
         )
         
-        # Newsletter repository
+        # Newsletter repository - uses content_data container
         self._instances['newsletter_repository'] = NewsletterRepository(
             cosmos_client=self._cosmos_client,
-            container_name=self._settings.cosmos_container_newsletters
+            container_name=self._settings.cosmos_container_content
         )
         
-        # Message repository
+        # Message repository - uses operational_data container
         self._instances['message_repository'] = MessageRepository(
             cosmos_client=self._cosmos_client,
-            container_name=self._settings.cosmos_container_messages
+            container_name=self._settings.cosmos_container_operational
         )
         
         logger.info("All repositories initialized")
@@ -310,9 +310,8 @@ async def create_mock_container() -> DependencyContainer:
     
     # Mock settings
     mock_settings = Mock(spec=Settings)
-    mock_settings.cosmos_container_servers = "test_servers"
-    mock_settings.cosmos_container_tips = "test_tips"
-    mock_settings.cosmos_container_newsletters = "test_newsletters"
+    mock_settings.cosmos_container_operational = "test_operational"
+    mock_settings.cosmos_container_content = "test_content"
     container._settings = mock_settings
     
     # Mock Cosmos client

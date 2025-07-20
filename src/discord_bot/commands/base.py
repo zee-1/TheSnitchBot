@@ -7,6 +7,8 @@ import asyncio
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional, List
 import discord
+from discord import app_commands
+
 from discord.ext import commands
 from datetime import datetime, timedelta
 import logging
@@ -202,12 +204,15 @@ class BaseCommand(ABC):
                 )
                 return
             
-            # Get server configuration
+            # IMPORTANT: Defer the interaction immediately to prevent timeout
+            await interaction.response.defer(ephemeral=False)
+            
+            # Get server configuration (this can take time)
             server_repo = container.get_server_repository()
-            server_config = await server_repo.get_by_server_id(str(interaction.guild_id))
+            server_config = await server_repo.get_by_server_id_partition(str(interaction.guild_id))
             
             if not server_config:
-                await interaction.response.send_message(
+                await interaction.followup.send(
                     "Server not configured. Please contact an administrator.",
                     ephemeral=True
                 )
@@ -218,7 +223,7 @@ class BaseCommand(ABC):
             
             # Check if command is enabled
             if not server_config.can_use_command(self.name):
-                await interaction.response.send_message(
+                await interaction.followup.send(
                     f"The `{self.name}` command is disabled on this server.",
                     ephemeral=True
                 )
@@ -226,7 +231,7 @@ class BaseCommand(ABC):
             
             # Check permissions
             if not await self.check_permissions(ctx):
-                await interaction.response.send_message(
+                await interaction.followup.send(
                     "You don't have permission to use this command.",
                     ephemeral=True
                 )
@@ -241,7 +246,7 @@ class BaseCommand(ABC):
                 remaining = self.cooldown_manager.get_remaining_cooldown(
                     self.name, ctx.user_id, ctx.guild_id, self.cooldown_seconds
                 )
-                await interaction.response.send_message(
+                await interaction.followup.send(
                     f"Command on cooldown. Try again in {remaining} seconds.",
                     ephemeral=True
                 )
@@ -267,7 +272,13 @@ class BaseCommand(ABC):
                 error=error_message
             )
             
-            if not interaction.response.is_done():
+            # Since we deferred, use followup for error messages
+            if interaction.response.is_done():
+                await interaction.followup.send(
+                    f"Command failed: {error_message}",
+                    ephemeral=True
+                )
+            else:
                 await interaction.response.send_message(
                     f"Command failed: {error_message}",
                     ephemeral=True
@@ -283,7 +294,13 @@ class BaseCommand(ABC):
                 exc_info=True
             )
             
-            if not interaction.response.is_done():
+            # Since we deferred, use followup for error messages
+            if interaction.response.is_done():
+                await interaction.followup.send(
+                    "An unexpected error occurred. Please try again later.",
+                    ephemeral=True
+                )
+            else:
                 await interaction.response.send_message(
                     "An unexpected error occurred. Please try again later.",
                     ephemeral=True
@@ -424,7 +441,7 @@ class CommandRegistry:
     
     def setup_app_commands(
         self,
-        tree: discord.app_commands.CommandTree,
+        tree: app_commands.CommandTree,
         container: DependencyContainer
     ) -> None:
         """Set up app commands on the command tree."""
@@ -433,7 +450,7 @@ class CommandRegistry:
     
     def _create_app_command(
         self,
-        tree: discord.app_commands.CommandTree,
+        tree: app_commands.CommandTree,
         command: BaseCommand,
         container: DependencyContainer
     ) -> None:
@@ -443,7 +460,7 @@ class CommandRegistry:
             await command.handle_command(interaction, container, **kwargs)
         
         # Create the app command
-        app_command = discord.app_commands.Command(
+        app_command = app_commands.Command(
             name=command.name,
             description=command.description,
             callback=command_callback

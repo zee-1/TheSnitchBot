@@ -6,8 +6,8 @@ Handles Discord message data and metadata.
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 from enum import Enum
-from pydantic import Field, validator
-from .base import MessageEntity, VectorEntity
+from pydantic import Field, field_validator, ConfigDict
+from .base import CosmosDBEntity, VectorEntity
 
 
 class MessageType(str, Enum):
@@ -19,14 +19,32 @@ class MessageType(str, Enum):
     SYSTEM = "system"
 
 
-class ReactionData(MessageEntity):
+class ReactionData(CosmosDBEntity):
     """Represents a reaction on a Discord message."""
     
+    # Discord message fields
+    message_id: str = Field(..., description="Discord message ID")
+    channel_id: str = Field(..., description="Discord channel ID")
+    server_id: str = Field(..., description="Discord server/guild ID")
+    author_id: str = Field(..., description="Discord user ID")
+    content: str = Field(..., description="Reaction content")
+    timestamp: str = Field(..., description="Reaction timestamp (ISO format)")
+    
+    # Reaction specific fields
     emoji: str = Field(..., description="Emoji used for reaction")
     count: int = Field(..., description="Number of reactions")
     users: List[str] = Field(default_factory=list, description="List of user IDs who reacted")
     
-    @validator("count")
+    def __init__(self, **data):
+        """Initialize ReactionData with proper entity_type and partition_key."""
+        if 'entity_type' not in data:
+            data['entity_type'] = 'reaction'
+        if 'partition_key' not in data and 'server_id' in data:
+            data['partition_key'] = data['server_id']
+        super().__init__(**data)
+    
+    @field_validator("count")
+    @classmethod
     def validate_count(cls, v):
         """Ensure count is non-negative."""
         if v < 0:
@@ -34,8 +52,16 @@ class ReactionData(MessageEntity):
         return v
 
 
-class Message(MessageEntity):
+class Message(CosmosDBEntity):
     """Discord message with additional metadata for processing."""
+    
+    # Discord message fields
+    message_id: str = Field(..., description="Discord message ID")
+    channel_id: str = Field(..., description="Discord channel ID")
+    server_id: str = Field(..., description="Discord server/guild ID")
+    author_id: str = Field(..., description="Discord user ID")
+    content: str = Field(..., description="Message content")
+    timestamp: str = Field(..., description="Message timestamp (ISO format)")
     
     # Message type and threading
     message_type: MessageType = Field(MessageType.DEFAULT, description="Type of Discord message")
@@ -67,14 +93,24 @@ class Message(MessageEntity):
     # Embeddings and vector data
     embedding_id: Optional[str] = Field(None, description="ChromaDB embedding document ID")
     
-    @validator("content")
+    def __init__(self, **data):
+        """Initialize Message with proper entity_type and partition_key."""
+        if 'entity_type' not in data:
+            data['entity_type'] = 'message'
+        if 'partition_key' not in data and 'server_id' in data:
+            data['partition_key'] = data['server_id']
+        super().__init__(**data)
+    
+    @field_validator("content")
+    @classmethod
     def validate_content(cls, v):
         """Validate message content."""
         if len(v) > 4000:  # Discord's max message length is 2000, but we allow some buffer
             raise ValueError("Message content too long")
         return v
     
-    @validator("controversy_score", "sentiment_score", "toxicity_score")
+    @field_validator("controversy_score", "sentiment_score", "toxicity_score")
+    @classmethod
     def validate_scores(cls, v):
         """Validate score ranges."""
         if not -1 <= v <= 1:
@@ -155,7 +191,7 @@ class Message(MessageEntity):
             server_id=self.server_id,
             author_id=user_id,
             content=emoji,
-            timestamp=datetime.now(),
+            timestamp=datetime.now().isoformat(),
             emoji=emoji,
             count=1,
             users=[user_id]
@@ -217,14 +253,16 @@ class Message(MessageEntity):
         # Convert reactions
         reactions = []
         for reaction in discord_message.reactions:
-            reaction_users = [str(user.id) async for user in reaction.users()]
+            # Note: This needs to be called in an async context
+            # reaction_users = [str(user.id) async for user in reaction.users()]
+            reaction_users = []  # Placeholder - should be populated in async context
             reactions.append(ReactionData(
                 message_id=str(discord_message.id),
                 channel_id=str(discord_message.channel.id),
                 server_id=server_id,
                 author_id=str(discord_message.author.id),
                 content=str(reaction.emoji),
-                timestamp=discord_message.created_at,
+                timestamp=discord_message.created_at.isoformat(),
                 emoji=str(reaction.emoji),
                 count=reaction.count,
                 users=reaction_users
@@ -243,7 +281,7 @@ class Message(MessageEntity):
             server_id=server_id,
             author_id=str(discord_message.author.id),
             content=discord_message.content,
-            timestamp=discord_message.created_at,
+            timestamp=discord_message.created_at.isoformat(),
             message_type=message_type,
             thread_id=str(discord_message.channel.id) if message_type == MessageType.THREAD_MESSAGE else None,
             parent_message_id=str(discord_message.reference.message_id) if discord_message.reference else None,

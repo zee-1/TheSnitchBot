@@ -6,7 +6,7 @@ Handles newsletter generation and delivery tracking.
 from datetime import datetime, date
 from typing import Optional, List, Dict, Any
 from enum import Enum
-from pydantic import Field, validator
+from pydantic import Field, field_validator, ConfigDict
 from .base import CosmosDBEntity
 
 
@@ -58,7 +58,8 @@ class StoryData(CosmosDBEntity):
         """Use story_id as partition key."""
         return self.story_id
     
-    @validator("controversy_score", "engagement_score", "relevance_score")
+    @field_validator("controversy_score", "engagement_score", "relevance_score")
+    @classmethod
     def validate_scores(cls, v):
         """Validate score ranges."""
         if not 0 <= v <= 1:
@@ -112,7 +113,16 @@ class Newsletter(CosmosDBEntity):
     delivery_errors: List[str] = Field(default_factory=list, description="Errors during delivery")
     retry_count: int = Field(0, description="Number of retry attempts")
     
-    @validator("newsletter_date")
+    def __init__(self, **data):
+        """Initialize Newsletter with proper entity_type and partition_key."""
+        if 'entity_type' not in data:
+            data['entity_type'] = 'newsletter'
+        if 'partition_key' not in data and 'server_id' in data:
+            data['partition_key'] = data['server_id']
+        super().__init__(**data)
+    
+    @field_validator("newsletter_date")
+    @classmethod
     def validate_newsletter_date(cls, v):
         """Validate newsletter date is not in the future."""
         if v > date.today():
@@ -149,13 +159,13 @@ class Newsletter(CosmosDBEntity):
         """Mark newsletter generation as started."""
         self.status = NewsletterStatus.GENERATING
         self.persona_used = persona
-        self.generation_started_at = datetime.now()
+        self.generation_started_at = datetime.now().isoformat()
         self.update_timestamp()
     
     def complete_generation(self) -> None:
         """Mark newsletter generation as completed."""
         self.status = NewsletterStatus.GENERATED
-        self.generation_completed_at = datetime.now()
+        self.generation_completed_at = datetime.now().isoformat()
         self.update_timestamp()
     
     def start_delivery(self, channel_id: str) -> None:
@@ -168,16 +178,17 @@ class Newsletter(CosmosDBEntity):
         """Mark newsletter delivery as completed."""
         self.status = NewsletterStatus.DELIVERED
         self.delivery_message_id = message_id
-        self.delivered_at = datetime.now()
+        self.delivered_at = datetime.now().isoformat()
         self.update_timestamp()
     
     def mark_failed(self, error_message: str, is_generation_error: bool = True) -> None:
         """Mark newsletter as failed with error."""
         self.status = NewsletterStatus.FAILED
+        timestamp_str = datetime.now().isoformat()
         if is_generation_error:
-            self.generation_errors.append(f"[{datetime.now()}] {error_message}")
+            self.generation_errors.append(f"[{timestamp_str}] {error_message}")
         else:
-            self.delivery_errors.append(f"[{datetime.now()}] {error_message}")
+            self.delivery_errors.append(f"[{timestamp_str}] {error_message}")
         self.update_timestamp()
     
     def add_story(self, story: StoryData, is_featured: bool = False) -> None:

@@ -50,21 +50,16 @@ class CosmosDBClient:
             raise
     
     async def _initialize_containers(self) -> None:
-        """Initialize all required containers."""
+        """Initialize required containers for 2-container approach."""
         container_configs = [
             {
-                "id": self.settings.cosmos_container_servers,
-                "partition_key": PartitionKey(path="/server_id"),
+                "id": self.settings.cosmos_container_operational,
+                "partition_key": PartitionKey(path="/partition_key"),
                 "default_ttl": None
             },
             {
-                "id": self.settings.cosmos_container_tips,
-                "partition_key": PartitionKey(path="/server_id"),
-                "default_ttl": None
-            },
-            {
-                "id": self.settings.cosmos_container_newsletters,
-                "partition_key": PartitionKey(path="/server_id"),
+                "id": self.settings.cosmos_container_content,
+                "partition_key": PartitionKey(path="/partition_key"),
                 "default_ttl": None
             }
         ]
@@ -74,7 +69,7 @@ class CosmosDBClient:
                 container = await self.database.create_container_if_not_exists(
                     id=config["id"],
                     partition_key=config["partition_key"],
-                    offer_throughput=400  # Minimum throughput for free tier
+                    offer_throughput=500  # 500 RU/s each for 2-container setup
                 )
                 self.containers[config["id"]] = container
                 logger.info(f"Container '{config['id']}' initialized")
@@ -90,6 +85,13 @@ class CosmosDBClient:
             self._initialized = False
             logger.info("Cosmos DB client closed")
     
+    def get_container_for_entity_type(self, entity_type: str) -> str:
+        """Get the appropriate container name for an entity type."""
+        if entity_type == 'newsletter':
+            return self.settings.cosmos_container_content
+        else:  # servers, tips, messages, reactions go to operational
+            return self.settings.cosmos_container_operational
+    
     async def create_item(
         self, 
         container_name: str, 
@@ -102,10 +104,11 @@ class CosmosDBClient:
         
         try:
             container = self.containers[container_name]
-            response = await container.create_item(
-                body=item,
-                partition_key=partition_key
-            )
+            # Ensure partition key is in the item data
+            if 'partition_key' not in item:
+                item['partition_key'] = partition_key
+            
+            response = await container.create_item(body=item)
             logger.debug(f"Created item in {container_name}: {item.get('id')}")
             return response
             
@@ -154,10 +157,11 @@ class CosmosDBClient:
         
         try:
             container = self.containers[container_name]
-            response = await container.upsert_item(
-                body=item,
-                partition_key=partition_key
-            )
+            # Ensure partition key is in the item data
+            if 'partition_key' not in item:
+                item['partition_key'] = partition_key
+                
+            response = await container.upsert_item(body=item)
             logger.debug(f"Updated item in {container_name}: {item.get('id')}")
             return response
             

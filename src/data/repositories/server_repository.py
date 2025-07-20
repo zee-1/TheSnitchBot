@@ -4,7 +4,7 @@ Handles Discord server configuration CRUD operations.
 """
 
 from typing import List, Optional
-from datetime import datetime, time
+from datetime import datetime
 import logging
 
 from src.models.server import ServerConfig, PersonaType, ServerStatus
@@ -24,6 +24,12 @@ class ServerRepository(BaseRepository[ServerConfig]):
         """Get server configuration by Discord server ID."""
         return await self.get_by_id(server_id, server_id)
     
+    async def get_by_server_id_partition(self, server_id: str) -> Optional[ServerConfig]:
+        """Get server configuration by Discord server ID."""
+        result = await self.get_by_partition(partition_key= server_id)
+        return result
+    
+
     async def create_server(
         self, 
         server_id: str, 
@@ -38,7 +44,7 @@ class ServerRepository(BaseRepository[ServerConfig]):
             status=ServerStatus.ACTIVE,
             persona=PersonaType.SASSY_REPORTER,
             newsletter_enabled=True,
-            newsletter_time=time(9, 0),  # 9 AM UTC
+            newsletter_time="09:00",  # 9 AM UTC
             admin_users=[owner_id]  # Owner is automatically an admin
         )
         
@@ -66,10 +72,9 @@ class ServerRepository(BaseRepository[ServerConfig]):
         
         return await self.query(query=query, parameters=parameters)
     
-    async def get_servers_due_for_newsletter(self, current_time: time) -> List[ServerConfig]:
+    async def get_servers_due_for_newsletter(self, current_time: str) -> List[ServerConfig]:
         """Get servers that are due for newsletter delivery."""
-        # Convert time to string for comparison
-        time_str = current_time.strftime("%H:%M")
+        # current_time is already a string in HH:MM format
         
         query = """
         SELECT * FROM c 
@@ -79,7 +84,7 @@ class ServerRepository(BaseRepository[ServerConfig]):
         """
         parameters = [
             {"name": "@status", "value": ServerStatus.ACTIVE.value},
-            {"name": "@time", "value": time_str}
+            {"name": "@time", "value": current_time}
         ]
         
         return await self.query(query=query, parameters=parameters)
@@ -87,24 +92,27 @@ class ServerRepository(BaseRepository[ServerConfig]):
     async def update_newsletter_channel(self, server_id: str, channel_id: str) -> bool:
         """Update newsletter delivery channel for a server."""
         try:
-            server_config = await self.get_by_server_id(server_id)
+        
+            server_config = await self.get_by_server_id_partition(server_id)
+            logger.info(f"Updated newsletter channel for server {server_id}: {channel_id}")
             if not server_config:
                 return False
             
             server_config.newsletter_channel_id = channel_id
             await self.update(server_config)
             
-            logger.info(f"Updated newsletter channel for server {server_id}: {channel_id}")
             return True
-            
         except Exception as e:
+            print("===="*8)
+            print(e)
+            logger.info(e)
             logger.error(f"Failed to update newsletter channel for server {server_id}: {e}")
             return False
     
-    async def update_newsletter_time(self, server_id: str, newsletter_time: time) -> bool:
+    async def update_newsletter_time(self, server_id: str, newsletter_time: str) -> bool:
         """Update newsletter delivery time for a server."""
         try:
-            server_config = await self.get_by_server_id(server_id)
+            server_config = await self.get_by_server_id_partition(server_id)
             if not server_config:
                 return False
             
@@ -121,7 +129,7 @@ class ServerRepository(BaseRepository[ServerConfig]):
     async def update_persona(self, server_id: str, persona: PersonaType) -> bool:
         """Update bot persona for a server."""
         try:
-            server_config = await self.get_by_server_id(server_id)
+            server_config = await self.get_by_server_id_partition(server_id)
             if not server_config:
                 return False
             
@@ -138,7 +146,7 @@ class ServerRepository(BaseRepository[ServerConfig]):
     async def add_admin(self, server_id: str, user_id: str) -> bool:
         """Add admin to server."""
         try:
-            server_config = await self.get_by_server_id(server_id)
+            server_config = await self.get_by_server_id_partition(server_id)
             if not server_config:
                 return False
             
@@ -155,7 +163,7 @@ class ServerRepository(BaseRepository[ServerConfig]):
     async def remove_admin(self, server_id: str, user_id: str) -> bool:
         """Remove admin from server."""
         try:
-            server_config = await self.get_by_server_id(server_id)
+            server_config = await self.get_by_server_id_partition(server_id)
             if not server_config:
                 return False
             
@@ -172,7 +180,7 @@ class ServerRepository(BaseRepository[ServerConfig]):
     async def add_moderator(self, server_id: str, user_id: str) -> bool:
         """Add moderator to server."""
         try:
-            server_config = await self.get_by_server_id(server_id)
+            server_config = await self.get_by_server_id_partition(server_id)
             if not server_config:
                 return False
             
@@ -189,7 +197,7 @@ class ServerRepository(BaseRepository[ServerConfig]):
     async def remove_moderator(self, server_id: str, user_id: str) -> bool:
         """Remove moderator from server."""
         try:
-            server_config = await self.get_by_server_id(server_id)
+            server_config = await self.get_by_server_id_partition(server_id)
             if not server_config:
                 return False
             
@@ -206,7 +214,7 @@ class ServerRepository(BaseRepository[ServerConfig]):
     async def toggle_feature(self, server_id: str, feature_name: str, enabled: bool) -> bool:
         """Toggle a feature for a server."""
         try:
-            server_config = await self.get_by_server_id(server_id)
+            server_config = await self.get_by_server_id_partition(server_id)
             if not server_config:
                 return False
             

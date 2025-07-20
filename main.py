@@ -7,7 +7,12 @@ import asyncio
 import sys
 import signal
 import logging
+import os
 from pathlib import Path
+
+# Disable ChromaDB telemetry to prevent posthog errors
+os.environ['ANONYMIZED_TELEMETRY'] = 'False'
+os.environ['CHROMA_TELEMETRY'] = 'False'
 
 # Add src to Python path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
@@ -15,20 +20,22 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 from src.core.config import get_settings
 from src.core.logging import setup_logging
 from src.core.exceptions import BotInitializationError
-from src.discord.bot import run_bot
+from src.discord_bot.bot import run_bot
 
 
 async def main():
     """Main entry point for the bot."""
-    # Setup logging first
-    setup_logging()
-    logger = logging.getLogger(__name__)
-    
-    logger.info("Starting The Snitch Discord Bot...")
-    
     try:
-        # Validate configuration
+        # Get settings first
         settings = get_settings()
+        
+        # Setup logging with settings
+        setup_logging(settings)
+        logger = logging.getLogger(__name__)
+        
+        logger.info("Starting The Snitch Discord Bot...")
+        
+        # Validate configuration
         
         # Check required environment variables
         required_vars = [

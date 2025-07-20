@@ -5,7 +5,7 @@ Provides common functionality for all data models.
 
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 import uuid
 
 
@@ -13,34 +13,40 @@ class BaseEntity(BaseModel):
     """Base class for all entities with common fields."""
     
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), description="Unique identifier")
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="Creation timestamp")
-    updated_at: Optional[datetime] = Field(None, description="Last update timestamp")
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat(), description="Creation timestamp (ISO format)")
+    updated_at: Optional[str] = Field(None, description="Last update timestamp (ISO format)")
     
     def update_timestamp(self) -> None:
         """Update the updated_at timestamp."""
-        self.updated_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(timezone.utc).isoformat()
     
-    class Config:
-        """Pydantic configuration."""
-        json_encoders = {
+    model_config = ConfigDict(
+        json_encoders={
             datetime: lambda v: v.isoformat() if v else None
-        }
-        validate_assignment = True
-        use_enum_values = True
+        },
+        validate_assignment=True,
+        use_enum_values=True
+    )
 
 
 class CosmosDBEntity(BaseEntity):
     """Base class for entities stored in Cosmos DB."""
     
     partition_key: str = Field(..., description="Cosmos DB partition key")
-    _etag: Optional[str] = Field(None, alias="etag", description="Cosmos DB etag for optimistic concurrency")
-    _ts: Optional[int] = Field(None, alias="ts", description="Cosmos DB timestamp")
+    entity_type: str = Field(..., description="Entity type discriminator for multi-entity containers")
+    etag: Optional[str] = Field(None, description="Cosmos DB etag for optimistic concurrency")
+    ts: Optional[int] = Field(None, description="Cosmos DB timestamp")
     
     def to_cosmos_dict(self) -> Dict[str, Any]:
         """Convert to dictionary suitable for Cosmos DB storage."""
-        data = self.dict(by_alias=True, exclude_none=True)
+        data = self.model_dump(exclude_none=True)
         # Ensure id is a string
         data["id"] = str(self.id)
+        # Map fields back to Cosmos DB naming
+        if "etag" in data:
+            data["_etag"] = data.pop("etag")
+        if "ts" in data:
+            data["_ts"] = data.pop("ts")
         return data
     
     @classmethod
@@ -65,11 +71,11 @@ class MessageEntity(BaseModel):
     content: str = Field(..., description="Message content")
     timestamp: datetime = Field(..., description="Message timestamp")
     
-    class Config:
-        """Pydantic configuration."""
-        json_encoders = {
+    model_config = ConfigDict(
+        json_encoders={
             datetime: lambda v: v.isoformat() if v else None
         }
+    )
 
 
 class VectorEntity(BaseModel):
@@ -79,6 +85,6 @@ class VectorEntity(BaseModel):
     document_id: str = Field(..., description="Document identifier")
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Metadata for the document")
     
-    class Config:
-        """Pydantic configuration."""
-        validate_assignment = True
+    model_config = ConfigDict(
+        validate_assignment=True
+    )

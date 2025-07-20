@@ -6,7 +6,7 @@ Handles Discord server settings and preferences.
 from datetime import datetime, time
 from typing import Optional, List, Dict, Any
 from enum import Enum
-from pydantic import Field, validator
+from pydantic import Field, field_validator, ConfigDict
 from .base import CosmosDBEntity
 
 
@@ -42,9 +42,9 @@ class ServerConfig(CosmosDBEntity):
     # Newsletter settings
     newsletter_enabled: bool = Field(True, description="Whether newsletter is enabled")
     newsletter_channel_id: Optional[str] = Field(None, description="Channel for newsletter delivery")
-    newsletter_time: time = Field(time(9, 0), description="Time to send newsletter (UTC)")
+    newsletter_time: str = Field("09:00", description="Time to send newsletter (HH:MM format)")
     newsletter_timezone: str = Field("UTC", description="Timezone for newsletter scheduling")
-    last_newsletter_sent: Optional[datetime] = Field(None, description="Last newsletter timestamp")
+    last_newsletter_sent: Optional[str] = Field(None, description="Last newsletter timestamp (ISO format)")
     
     # Content settings
     max_messages_analysis: int = Field(1000, description="Max messages to analyze for newsletter")
@@ -69,28 +69,40 @@ class ServerConfig(CosmosDBEntity):
     blacklisted_words: List[str] = Field(default_factory=list, description="Words to filter from content")
     whitelisted_channels: List[str] = Field(default_factory=list, description="Channels to monitor")
     
-    @validator("server_id")
+    def __init__(self, **data):
+        """Initialize ServerConfig with proper entity_type and partition_key."""
+        if 'entity_type' not in data:
+            data['entity_type'] = 'server'
+        if 'partition_key' not in data and 'server_id' in data:
+            data['partition_key'] = data['server_id']
+        super().__init__(**data)
+    
+    @field_validator("server_id")
+    @classmethod
     def validate_server_id(cls, v):
         """Validate Discord server ID format."""
         if not v.isdigit():
             raise ValueError("Server ID must be a valid Discord snowflake")
         return v
     
-    @validator("owner_id")
+    @field_validator("owner_id")
+    @classmethod
     def validate_owner_id(cls, v):
         """Validate Discord user ID format."""
         if not v.isdigit():
             raise ValueError("Owner ID must be a valid Discord snowflake")
         return v
     
-    @validator("newsletter_channel_id")
+    @field_validator("newsletter_channel_id")
+    @classmethod
     def validate_newsletter_channel_id(cls, v):
         """Validate Discord channel ID format."""
         if v is not None and not v.isdigit():
             raise ValueError("Newsletter channel ID must be a valid Discord snowflake")
         return v
     
-    @validator("admin_users", "moderator_users", "whitelisted_channels")
+    @field_validator("admin_users", "moderator_users", "whitelisted_channels")
+    @classmethod
     def validate_discord_ids(cls, v):
         """Validate list of Discord IDs."""
         for item in v:
@@ -98,7 +110,8 @@ class ServerConfig(CosmosDBEntity):
                 raise ValueError("All Discord IDs must be valid snowflakes")
         return v
     
-    @validator("controversy_threshold")
+    @field_validator("controversy_threshold")
+    @classmethod
     def validate_controversy_threshold(cls, v):
         """Validate controversy threshold is between 0 and 1."""
         if not 0 <= v <= 1:
@@ -158,10 +171,10 @@ class ServerConfig(CosmosDBEntity):
             self.moderator_users.remove(user_id)
             self.update_timestamp()
     
-    class Config:
-        """Pydantic configuration."""
-        use_enum_values = True
-        json_encoders = {
+    model_config = ConfigDict(
+        use_enum_values=True,
+        json_encoders={
             time: lambda v: v.strftime("%H:%M") if v else None,
             datetime: lambda v: v.isoformat() if v else None
         }
+    )

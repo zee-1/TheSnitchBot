@@ -8,7 +8,7 @@ from typing import Dict, Any, List
 import random
 from datetime import datetime, timedelta
 
-from src.discord.commands.base import PublicCommand, CommandContext, EmbedBuilder
+from src.discord_bot.commands.base import PublicCommand, CommandContext, EmbedBuilder
 from src.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -39,7 +39,7 @@ class LeakCommand(PublicCommand):
             settings = ctx.container.get_settings()
             
             # Import here to avoid circular imports
-            from src.discord.client import get_discord_client
+            from src.discord_bot.client import get_discord_client
             discord_client = await get_discord_client(settings)
             
             # Get recently active users from the last hour
@@ -158,14 +158,14 @@ class LeakCommand(PublicCommand):
                 f"Breaking investigation: Multiple sources confirm {target_name} {random.choice(['once tried to friend request their own alt account', 'bought a plant just to have someone to talk to', 'has a secret handshake with their coffee maker', 'rates their meals on Yelp even when cooking at home', 'apologizes to furniture when they bump into it'])}."
             ],
             'sports_commentator': [
-                f"BREAKING NEWS FROM THE FIELD! {target_name} has been spotted {random.choice(['doing victory dances after opening jars', 'trash-talking NPCs in single-player games', 'celebrating goals scored in FIFA like they\'re real', 'high-fiving their pet after successful treats', 'doing play-by-play commentary while cooking'])}! What a legend! 🏆",
+                f"BREAKING NEWS FROM THE FIELD! {target_name} has been spotted {random.choice(['doing victory dances after opening jars', 'trash-talking NPCs in single-player games', 'celebrating goals scored in FIFA like they are real', 'high-fiving their pet after successful treats', 'doing play-by-play commentary while cooking'])}! What a legend! 🏆",
                 f"AND HERE COMES {target_name.upper()} WITH THE PLAY OF THE CENTURY! Sources say they {random.choice(['once scored a perfect game of solitaire', 'achieved a high score in typing tests', 'won an argument with autocorrect', 'successfully untangled earbuds on the first try', 'parallel parked in one attempt'])}! UNBELIEVABLE! 🎯",
                 f"LADIES AND GENTLEMEN, we have confirmation that {target_name} {random.choice(['practices their signature for when they become famous', 'does touchdown dances after successfully opening packages', 'celebrates personal victories with air guitar solos', 'has a victory playlist for completing mundane tasks', 'treats grocery shopping like a competitive sport'])}! THE CROWD GOES WILD! 📣",
                 f"EXCLUSIVE SPORTS LEAK! {target_name} has been {random.choice(['training for the Olympics of procrastination', 'perfecting their victory speech for winning arguments in the shower', 'practicing their game face in mirrors', 'developing strategies for competitive Netflix watching', 'coaching their houseplants to grow faster'])}! WHAT DEDICATION! 💪"
             ],
             'conspiracy_theorist': [
                 f"WAKE UP SHEEPLE! {target_name} is clearly {random.choice(['an agent for Big Cereal', 'secretly communicating with pigeons', 'part of the underground sock puppet mafia', 'a time traveler from the age of dial-up internet', 'working for the Department of Lost Socks'])}! The signs are everywhere! 👁️",
-                f"THE TRUTH IS OUT THERE! Sources deep within the system reveal {target_name} {random.choice(['knows the real reason why hot dogs come in packs of 10 but buns in packs of 8', 'has been hoarding USB cables for the apocalypse', 'can communicate with printers and make them work', 'knows where all the missing Tupperware lids go', 'has the real explanation for why there\'s always that one sock missing'])}! 🛸",
+                f"THE TRUTH IS OUT THERE! Sources deep within the system reveal {target_name} {random.choice(['knows the real reason why hot dogs come in packs of 10 but buns in packs of 8', 'has been hoarding USB cables for the apocalypse', 'can communicate with printers and make them work', 'knows where all the missing Tupperware lids go', 'has the real explanation for why there is always that one sock missing'])}! 🛸",
                 f"GOVERNMENT COVER-UP EXPOSED! {target_name} allegedly {random.choice(['discovered the secret to making printers work on the first try', 'knows the location of the missing area between floors in elevators', 'has photographic evidence of functioning ice cream machines', 'possesses the ancient knowledge of how to fold fitted sheets', 'holds the key to understanding why traffic is always worse in the other lane'])}! 🔍",
                 f"THE ILLUMINATI DOESN'T WANT YOU TO KNOW: {target_name} has been {random.choice(['secretly organizing the migration patterns of shopping carts', 'controlling the algorithm that decides which sock goes missing', 'part of the conspiracy to make all USB plugs require 3 attempts', 'behind the plot to make every group project have one person who does nothing', 'orchestrating the great mystery of why phone chargers disappear'])}! COINCIDENCE? I THINK NOT! 🎭"
             ]
@@ -186,5 +186,5 @@ class LeakCommand(PublicCommand):
 
 
 # Register the command
-from src.discord.commands.base import command_registry
+from src.discord_bot.commands.base import command_registry
 command_registry.register(LeakCommand())

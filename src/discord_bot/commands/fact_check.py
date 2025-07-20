@@ -8,7 +8,7 @@ from typing import Dict, Any
 import random
 from datetime import datetime
 
-from src.discord.commands.base import PublicCommand, CommandContext, EmbedBuilder
+from src.discord_bot.commands.base import PublicCommand, CommandContext, EmbedBuilder
 from src.core.exceptions import InvalidCommandArgumentError
 from src.core.logging import get_logger
 from src.utils.validation import validate_discord_id
@@ -68,7 +68,7 @@ class FactCheckCommand(PublicCommand):
             settings = ctx.container.get_settings()
             
             # Import here to avoid circular imports
-            from src.discord.client import get_discord_client
+            from src.discord_bot.client import get_discord_client
             discord_client = await get_discord_client(settings)
             
             # Get the target message
@@ -462,5 +462,5 @@ class FactCheckCommand(PublicCommand):
 
 
 # Register the command
-from src.discord.commands.base import command_registry
+from src.discord_bot.commands.base import command_registry
 command_registry.register(FactCheckCommand())

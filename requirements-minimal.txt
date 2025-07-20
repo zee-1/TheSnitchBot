@@ -5,8 +5,8 @@
 discord.py==2.3.2
 
 # Data Validation & Configuration  
-pydantic==2.5.2
-pydantic-settings==2.1.0
+pydantic==1.10.22
+# pydantic-settings==2.1.0
 python-dotenv==1.0.0
 
 # Azure Cloud Services (Core)
@@ -23,7 +23,7 @@ langchain-community==0.0.13
 # Vector Database & Embeddings
 chromadb==0.4.22
 sentence-transformers==2.2.2
-numpy==1.24.4
+numpy>=1.26.0
 
 # HTTP & Async
 httpx==0.26.0
@@ -38,12 +38,12 @@ pytz==2023.3.post1
 structlog==23.2.0
 
 # Security
-cryptography==41.0.8
+cryptography==41.0.7
 
 # Utilities
 typing-extensions==4.8.0
 tenacity==8.2.3
 
 # Platform-specific
-pywin32==306; sys_platform == "win32"
-uvloop==0.19.0; sys_platform != "win32"
+# pywin32==307; sys_platform == "win32"
+# uvloop==0.19.0; sys_platform != "win32"

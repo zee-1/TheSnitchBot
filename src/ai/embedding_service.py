@@ -10,6 +10,10 @@ import asyncio
 import numpy as np
 
 try:
+    # Disable ChromaDB telemetry to avoid posthog errors
+    import os
+    os.environ['ANONYMIZED_TELEMETRY'] = 'False'
+    
     import chromadb
     from chromadb.config import Settings
     from chromadb.utils import embedding_functions

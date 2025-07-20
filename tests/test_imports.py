@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 # Add src to Python path
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 def test_imports():
     """Test all critical imports."""
@@ -50,8 +50,8 @@ def test_imports():
         
         # Discord imports
         print("📦 Testing Discord modules...")
-        from src.discord.bot import SnitchBot
-        from src.discord.commands.base import PublicCommand
+        from src.discord_bot.bot import SnitchBot
+        from src.discord_bot.commands.base import PublicCommand
         print("✅ Discord modules imported successfully")
         
         # Test configuration loading

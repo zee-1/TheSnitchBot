@@ -41,6 +41,17 @@ class InvalidConfigurationError(ConfigurationError):
     pass
 
 
+# Bot Lifecycle Exceptions
+class BotInitializationError(SnitchBotError):
+    """Raised when the bot fails to initialize properly."""
+    pass
+
+
+class MessageProcessingError(SnitchBotError):
+    """Raised when there's an error processing Discord messages."""
+    pass
+
+
 # Database Exceptions
 class DatabaseError(SnitchBotError):
     """Base exception for database-related errors."""

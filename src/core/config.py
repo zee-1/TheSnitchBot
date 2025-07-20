@@ -3,7 +3,8 @@ Configuration management for The Snitch Discord Bot.
 Handles environment variables and application settings.
 """
 
-from pydantic import BaseSettings, Field, validator
+from pydantic_settings import BaseSettings
+from pydantic import Field, field_validator, ConfigDict
 from typing import Optional, List
 import os
 from pathlib import Path
@@ -26,10 +27,14 @@ class Settings(BaseSettings):
     # Azure Cosmos DB
     cosmos_connection_string: str = Field(..., env="COSMOS_CONNECTION_STRING")
     cosmos_database_name: str = Field("snitch_bot_db", env="COSMOS_DATABASE_NAME")
-    cosmos_container_servers: str = Field("servers", env="COSMOS_CONTAINER_SERVERS")
-    cosmos_container_tips: str = Field("tips", env="COSMOS_CONTAINER_TIPS")
-    cosmos_container_newsletters: str = Field("newsletters", env="COSMOS_CONTAINER_NEWSLETTERS")
-    cosmos_container_messages: str = Field("messages", env="COSMOS_CONTAINER_MESSAGES")
+    # 2-container setup for free tier optimization
+    cosmos_container_operational: str = Field("operational_data", env="COSMOS_CONTAINER_OPERATIONAL")  # servers + tips
+    cosmos_container_content: str = Field("content_data", env="COSMOS_CONTAINER_CONTENT")  # newsletters
+    # Legacy fields for backward compatibility
+    cosmos_container_servers: str = Field("operational_data", env="COSMOS_CONTAINER_SERVERS")
+    cosmos_container_tips: str = Field("operational_data", env="COSMOS_CONTAINER_TIPS")
+    cosmos_container_newsletters: str = Field("content_data", env="COSMOS_CONTAINER_NEWSLETTERS")
+    cosmos_container_messages: str = Field("operational_data", env="COSMOS_CONTAINER_MESSAGES")
     
     # Azure Blob Storage
     blob_connection_string: str = Field(..., env="BLOB_CONNECTION_STRING")
@@ -83,7 +88,8 @@ class Settings(BaseSettings):
     mock_ai_responses: bool = Field(False, env="MOCK_AI_RESPONSES")
     skip_discord_verification: bool = Field(False, env="SKIP_DISCORD_VERIFICATION")
     
-    @validator("log_level")
+    @field_validator("log_level")
+    @classmethod
     def validate_log_level(cls, v):
         """Validate log level is one of the accepted values."""
         valid_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
@@ -91,7 +97,8 @@ class Settings(BaseSettings):
             raise ValueError(f"Log level must be one of {valid_levels}")
         return v.upper()
     
-    @validator("environment")
+    @field_validator("environment")
+    @classmethod
     def validate_environment(cls, v):
         """Validate environment is one of the accepted values."""
         valid_envs = ["development", "staging", "production"]
@@ -99,7 +106,8 @@ class Settings(BaseSettings):
             raise ValueError(f"Environment must be one of {valid_envs}")
         return v.lower()
     
-    @validator("chroma_persist_directory")
+    @field_validator("chroma_persist_directory")
+    @classmethod
     def validate_chroma_directory(cls, v):
         """Ensure ChromaDB persist directory exists."""
         path = Path(v)
@@ -126,28 +134,13 @@ class Settings(BaseSettings):
         """Get ChromaDB persistence path (alias for embedding service)."""
         return self.chroma_persist_directory
     
-    class Config:
-        """Pydantic configuration."""
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = False
-        validate_assignment = True
-        
-        # Define fields that should be kept secret in logs
-        secrets = {
-            "discord_token",
-            "discord_client_secret", 
-            "azure_client_secret",
-            "cosmos_connection_string",
-            "blob_connection_string",
-            "service_bus_connection_string",
-            "groq_api_key",
-            "secret_key",
-            "encryption_key",
-            "azure_monitor_connection_string",
-            "application_insights_instrumentation_key",
-            "cloudflare_api_token"
-        }
+    model_config = ConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        validate_assignment=True,
+        # Note: secrets handling in Pydantic v2 is done differently
+    )
 
 
 # Global settings instance
@@ -156,6 +149,11 @@ settings = Settings()
 
 def get_settings() -> Settings:
     """Get application settings instance."""
+    return settings
+
+
+def get_config() -> Settings:
+    """Get application settings instance (alias for get_settings for backward compatibility)."""
     return settings
 
 

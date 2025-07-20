@@ -8,7 +8,7 @@ from typing import Dict, Any, Optional
 from datetime import time
 import re
 
-from src.discord.commands.base import AdminCommand, CommandContext, EmbedBuilder
+from src.discord_bot.commands.base import AdminCommand, CommandContext, EmbedBuilder
 from src.core.exceptions import InvalidCommandArgumentError
 from src.core.logging import get_logger
 from src.models.server import PersonaType
@@ -165,7 +165,7 @@ class SetNewsChannelCommand(AdminCommand):
         try:
             # Verify channel exists and bot has permissions
             settings = ctx.container.get_settings()
-            from src.discord.client import get_discord_client
+            from src.discord_bot.client import get_discord_client
             discord_client = await get_discord_client(settings)
             
             channel = await discord_client.get_channel(channel_id)
@@ -202,6 +202,8 @@ class SetNewsChannelCommand(AdminCommand):
             
             # Update server configuration
             server_repo = ctx.container.get_server_repository()
+            logger.info(f"Guild ID:{ctx.guild_id},Channel:{channel_id}")
+            
             success = await server_repo.update_newsletter_channel(ctx.guild_id, channel_id)
             
             if success:
@@ -462,7 +464,7 @@ class ServerStatusCommand(AdminCommand):
 
 
 # Register commands
-from src.discord.commands.base import command_registry
+from src.discord_bot.commands.base import command_registry
 command_registry.register(SetPersonaCommand())
 command_registry.register(SetNewsChannelCommand())
 command_registry.register(SetNewsTimeCommand())
