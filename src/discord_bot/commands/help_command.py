@@ -41,10 +41,12 @@ class HelpCommand(PublicCommand):
             
             # Admin Commands
             admin_commands = [
-                "`/config set-persona` - Set bot personality",
-                "`/config set-news-channel` - Set newsletter channel", 
-                "`/config set-news-time` - Set newsletter time",
-                "`/config bot-status` - View bot configuration"
+                "`/config set-persona` - Set bot personality (sassy, investigative, sports, etc.)",
+                "`/config set-newsletter-channel` - Set newsletter channel", 
+                "`/config set-newsletter-time` - Set newsletter time and timezone",
+                "`/config set-whitelist-channels` - Set channels to monitor",
+                "`/config set-blacklist-words` - Set words to ignore",
+                "`/config bot-status` - View current bot configuration"
             ]
             
             embed.add_field(
@@ -53,32 +55,60 @@ class HelpCommand(PublicCommand):
                 inline=False
             )
             
-            # Public Commands
+            # Content Commands
+            content_commands = [
+                "`/content breaking-news` - Generate breaking news from recent activity",
+                "`/content fact-check` - Fact-check a message (right-click → Apps → fact-check)",
+                "`/content controversy-check` - Analyze how controversial a message is",
+                "`/content submit-tip` - Submit anonymous tips for investigation"
+            ]
+            
+            # Other Public Commands  
             public_commands = [
-                "`/breaking-news` - Generate breaking news report",
-                "`/fact-check` - Get fact-checking on recent topics",
-                "`/leak` - Get exclusive server insights",
+                "`/leak` - Get exclusive server insights and rumors",
                 "`/help` - Show this help message"
             ]
             
             embed.add_field(
-                name="📢 Public Commands", 
+                name="📰 Content Commands", 
+                value="\n".join(content_commands),
+                inline=False
+            )
+            
+            embed.add_field(
+                name="📢 Other Commands", 
                 value="\n".join(public_commands),
                 inline=False
             )
             
             # Bot Features
             features = [
-                "🗞️ Daily automated newsletters",
-                "📊 Message analysis and trending topics", 
-                "🤖 Multiple personality modes",
-                "⚡ Real-time breaking news alerts",
-                "🔍 Smart fact-checking capabilities"
+                "🗞️ Daily automated newsletters with AI analysis",
+                "📊 Message analysis and controversy detection", 
+                "🤖 Multiple personality modes (sassy, investigative, sports, conspiracy)",
+                "⚡ Real-time breaking news from channel activity",
+                "🔍 Humorous fact-checking with context menu support",
+                "🕵️ Anonymous tip submission system",
+                "📈 Smart content categorization and trending topics"
             ]
             
             embed.add_field(
                 name="✨ Bot Features",
                 value="\n".join(features),
+                inline=False
+            )
+            
+            # Usage Tips
+            usage_tips = [
+                "💡 **Quick tip**: Right-click any message → **Apps** to fact-check or analyze controversy",
+                "📝 **Tip submission**: Use `/content submit-tip` to report interesting information",
+                "⏰ **Newsletters**: Set up automatic daily newsletters with `/config set-newsletter-channel`",
+                "🎭 **Personalities**: Try different bot personalities with `/config set-persona`"
+            ]
+            
+            embed.add_field(
+                name="💡 Usage Tips",
+                value="\n".join(usage_tips),
                 inline=False
             )
             
@@ -108,6 +138,8 @@ class HelpCommand(PublicCommand):
                 setup_info.append("⚠️ Newsletter channel not set")
             if not ctx.server_config.newsletter_enabled:
                 setup_info.append("⚠️ Newsletter disabled")
+            if not ctx.server_config.tip_submission_enabled:
+                setup_info.append("⚠️ Tip submission disabled")
             
             if setup_info:
                 embed.add_field(
