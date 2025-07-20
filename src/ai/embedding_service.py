@@ -137,7 +137,7 @@ class EmbeddingService:
                         "message_id": msg.message_id,
                         "channel_id": msg.channel_id,
                         "author_id": msg.author_id,
-                        "timestamp": msg.timestamp.isoformat(),
+                        "timestamp": msg.timestamp,
                         "engagement_score": msg.calculate_engagement_score(),
                         "controversy_score": msg.controversy_score,
                         "total_reactions": msg.total_reactions,
@@ -273,9 +273,10 @@ class EmbeddingService:
             query_text = self._prepare_message_text(message)
             
             # Calculate time filter
+            msg_dt = datetime.fromisoformat(message.timestamp.replace('Z', '+00:00'))
             time_filter = {
                 "timestamp": {
-                    "$gte": (message.timestamp.timestamp() - (time_window_hours * 3600))
+                    "$gte": (msg_dt.timestamp() - (time_window_hours * 3600))
                 }
             }
             
