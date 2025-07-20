@@ -43,26 +43,31 @@ class ControversyCheckCommand(PublicCommand):
         # Handle different ways the command can be used
         target_message_id = None
         
-        # Method 1: Check if it's a context menu command (right-click Apps)
-        if hasattr(ctx.interaction, 'data') and ctx.interaction.data.get('resolved', {}).get('messages'):
+        # Method 1: Check if this command was used as a reply to another message (RECOMMENDED)
+        if ctx.interaction.message and ctx.interaction.message.reference and ctx.interaction.message.reference.message_id:
+            target_message_id = str(ctx.interaction.message.reference.message_id)
+            
+        # Method 2: Check if it's a context menu command (right-click Apps)
+        elif hasattr(ctx.interaction, 'data') and ctx.interaction.data.get('resolved', {}).get('messages'):
             resolved_messages = ctx.interaction.data['resolved']['messages']
             target_message_id = list(resolved_messages.keys())[0]
             
-        # Method 2: Check if message_id parameter was provided
+        # Method 3: Check if message_id parameter was provided (fallback)
         elif message_id:
             target_message_id = message_id
             
-        # Method 3: No message specified - show help
+        # Method 4: No message specified - show help
         else:
             embed = EmbedBuilder.warning(
                 "How to Use Controversy Check",
                 "🤔 **You need to specify which message to analyze!**\n\n"
                 "**Option 1 (Recommended):**\n"
-                "Right-click on any message → **Apps** → **controversy-check**\n\n"
+                "Reply to any message and use `/content controversy-check`\n\n"
                 "**Option 2:**\n"
-                "Copy a message ID and use `/content controversy-check message_id:[paste ID]`\n\n"
-                "**To get a message ID:**\n"
-                "Enable Developer Mode in Discord settings, then right-click message → Copy Message ID"
+                "Right-click on any message → **Apps** → **controversy-check**\n\n"
+                "**Option 3 (Fallback):**\n"
+                "Use `/content controversy-check message_id:[paste ID]`\n\n"
+                "💡 **Pro tip:** Just reply to the message you want to analyze!"
             )
             await ctx.respond(embed=embed, ephemeral=True)
             return
@@ -261,7 +266,7 @@ class ControversyCheckCommand(PublicCommand):
                 inline=False
             )
             
-            embed.set_footer(text=f"Analyzed by {ctx.server_config.persona.value.replace('_', ' ').title()}")
+            embed.set_footer(text=f"Analyzed by {ctx.server_config.persona.replace('_', ' ').title()}")
             
             await ctx.respond(embed=embed)
             
@@ -341,7 +346,7 @@ class ControversyCheckCommand(PublicCommand):
             reasons.append("Part of an ongoing conversation thread")
         
         # Add persona-specific analysis flavor
-        persona = ctx.server_config.persona.value
+        persona = ctx.server_config.persona
         if persona == "sassy_reporter":
             if controversy_score > 0.5:
                 reasons.append("The tea is HOT on this one! ☕")

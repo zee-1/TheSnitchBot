@@ -68,26 +68,31 @@ class FactCheckCommand(PublicCommand):
         # Handle different ways the command can be used
         target_message_id = None
         
-        # Method 1: Check if it's a context menu command (right-click Apps)
-        if hasattr(ctx.interaction, 'data') and ctx.interaction.data.get('resolved', {}).get('messages'):
+        # Method 1: Check if this command was used as a reply to another message (RECOMMENDED)
+        if ctx.interaction.message and ctx.interaction.message.reference and ctx.interaction.message.reference.message_id:
+            target_message_id = str(ctx.interaction.message.reference.message_id)
+            
+        # Method 2: Check if it's a context menu command (right-click Apps)
+        elif hasattr(ctx.interaction, 'data') and ctx.interaction.data.get('resolved', {}).get('messages'):
             resolved_messages = ctx.interaction.data['resolved']['messages']
             target_message_id = list(resolved_messages.keys())[0]
             
-        # Method 2: Check if message_id parameter was provided
+        # Method 3: Check if message_id parameter was provided (fallback)
         elif message_id:
             target_message_id = message_id
             
-        # Method 3: No message specified - show help
+        # Method 4: No message specified - show help
         else:
             embed = EmbedBuilder.warning(
                 "How to Use Fact-Check",
                 "🤔 **You need to specify which message to fact-check!**\n\n"
                 "**Option 1 (Recommended):**\n"
-                "Right-click on any message → **Apps** → **fact-check**\n\n"
+                "Reply to any message and use `/content fact-check`\n\n"
                 "**Option 2:**\n"
-                "Copy a message ID and use `/content fact-check message_id:[paste ID]`\n\n"
-                "**To get a message ID:**\n"
-                "Enable Developer Mode in Discord settings, then right-click message → Copy Message ID"
+                "Right-click on any message → **Apps** → **fact-check**\n\n"
+                "**Option 3 (Fallback):**\n"
+                "Use `/content fact-check message_id:[paste ID]`\n\n"
+                "💡 **Pro tip:** Just reply to the message you want to fact-check!"
             )
             await ctx.respond(embed=embed, ephemeral=True)
             return
@@ -153,7 +158,7 @@ class FactCheckCommand(PublicCommand):
                     analysis = await ai_service.groq_client.analyze_content(
                         content=target_message.content,
                         analysis_type="fact_check",
-                        context=f"Discord message fact-check with {ctx.server_config.persona.value} persona"
+                        context=f"Discord message fact-check with {ctx.server_config.persona} persona"
                     )
                     
                     # Convert AI response to verdict format
@@ -210,7 +215,7 @@ class FactCheckCommand(PublicCommand):
             category = "needs_investigation"
         
         # Get persona-specific response using the same format as mock
-        persona = ctx.server_config.persona.value
+        persona = ctx.server_config.persona
         
         # Define verdict structure (same as mock)
         verdicts = {
@@ -344,7 +349,7 @@ class FactCheckCommand(PublicCommand):
             selected_category = 'needs_investigation'
         
         # Generate response based on category and persona
-        persona = ctx.server_config.persona.value
+        persona = ctx.server_config.persona
         
         verdicts = {
             'true': {

@@ -58,8 +58,8 @@ class HelpCommand(PublicCommand):
             # Content Commands
             content_commands = [
                 "`/content breaking-news` - Generate breaking news from recent activity",
-                "`/content fact-check` - Fact-check a message (right-click → Apps → fact-check)",
-                "`/content controversy-check` - Analyze how controversial a message is",
+                "`/content fact-check` - Fact-check a message (reply to message and use command)",
+                "`/content controversy-check` - Analyze how controversial a message is (reply to use)",
                 "`/content submit-tip` - Submit anonymous tips for investigation"
             ]
             
@@ -100,7 +100,7 @@ class HelpCommand(PublicCommand):
             
             # Usage Tips
             usage_tips = [
-                "💡 **Quick tip**: Right-click any message → **Apps** to fact-check or analyze controversy",
+                "💡 **Quick tip**: Reply to any message and use `/content fact-check` or `/content controversy-check`",
                 "📝 **Tip submission**: Use `/content submit-tip` to report interesting information",
                 "⏰ **Newsletters**: Set up automatic daily newsletters with `/config set-newsletter-channel`",
                 "🎭 **Personalities**: Try different bot personalities with `/config set-persona`"
