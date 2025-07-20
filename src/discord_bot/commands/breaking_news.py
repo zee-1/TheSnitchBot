@@ -126,7 +126,8 @@ class BreakingNewsCommand(PublicCommand):
                 ai_service = await get_ai_service()
                 
                 # Use mock responses if enabled in settings
-                if ctx.settings.mock_ai_responses:
+                settings = ctx.container.get_settings()
+                if settings.mock_ai_responses:
                     bulletin = await self._generate_mock_bulletin(filtered_messages, ctx)
                 else:
                     # Generate smart breaking news using AI service
@@ -217,7 +218,7 @@ class BreakingNewsCommand(PublicCommand):
                 bulletin += f"'{top_words[0][0]}' "
             bulletin += f"with a whopping {total_messages} messages in the last few hours.\n\n"
             
-            if most_controversial and most_controversial.controversy_score > 0.3:
+            if most_controversial and len(most_controversial.content) > 100:
                 bulletin += f"The tea is particularly hot with one user dropping this bombshell: "
                 bulletin += f'"{most_controversial.content[:100]}..."\n\n'
             
@@ -231,7 +232,7 @@ class BreakingNewsCommand(PublicCommand):
                 bulletin += f"'{top_words[0][0]}' "
             bulletin += "with multiple engagement indicators.\n\n"
             
-            if most_controversial and most_controversial.controversy_score > 0.3:
+            if most_controversial and len(most_controversial.content) > 100:
                 bulletin += f"Key statement under scrutiny: \"{most_controversial.content[:100]}...\"\n\n"
             
             bulletin += "Investigation ongoing. More details as they develop."
@@ -244,7 +245,7 @@ class BreakingNewsCommand(PublicCommand):
             if top_words:
                 bulletin += f"The hot topic? '{top_words[0][0].upper()}'! "
             
-            if most_controversial and most_controversial.controversy_score > 0.3:
+            if most_controversial and len(most_controversial.content) > 100:
                 bulletin += f"OH MY! One player just dropped this MASSIVE play: "
                 bulletin += f'"{most_controversial.content[:100]}..."\n\n'
             
@@ -257,7 +258,7 @@ class BreakingNewsCommand(PublicCommand):
             if top_words:
                 bulletin += f"Primary discussion topic: '{top_words[0][0]}'. "
             
-            if most_controversial and most_controversial.controversy_score > 0.3:
+            if most_controversial and len(most_controversial.content) > 100:
                 bulletin += f"\n\nHighlighted message: \"{most_controversial.content[:100]}...\""
             
             bulletin += "\n\nStay informed with The Snitch!"
