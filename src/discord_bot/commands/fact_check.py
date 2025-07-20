@@ -145,6 +145,8 @@ class FactCheckCommand(PublicCommand):
                 return
             
             # Generate fact-check verdict
+            import traceback
+
             try:
                 settings = ctx.container.get_settings()
                 if settings.mock_ai_responses:
@@ -155,16 +157,35 @@ class FactCheckCommand(PublicCommand):
                     ai_service = await get_ai_service()
                     
                     # Analyze the message content for fact-checking
+                    # Fetch persona from database using container if ctx.server_config is None
+                    persona_name = "sassy_reporter"  # Default fallback
+                    if ctx.server_config and ctx.server_config.persona:
+                        persona_name = ctx.server_config.persona
+                    else:
+                        
+                        # Try to get server config from database
+                        try:
+                            server_repo = ctx.container.get_server_repository()
+                            server_config = await server_repo.get_by_server_id_partition(str(ctx.guild_id))
+                            if not server_config:
+                                server_config = await server_repo.get_by_server_id(str(ctx.guild_id))
+                            
+                            if server_config and server_config.persona:
+                                persona_name = server_config.persona
+                        except Exception as e:
+                            logger.warning(f"Failed to fetch server config for persona: {e}")
+                    
                     analysis = await ai_service.groq_client.analyze_content(
                         content=target_message.content,
                         analysis_type="fact_check",
-                        context=f"Discord message fact-check with {ctx.server_config.persona} persona"
+                        context=f"Discord message fact-check with {persona_name} persona"
                     )
                     
                     # Convert AI response to verdict format
                     verdict = await self._convert_ai_response_to_verdict(analysis, ctx)
                     
             except Exception as ai_error:
+                print(repr(traceback.format_exception(ai_error)))
                 logger.warning(f"AI fact-check failed, falling back to mock: {ai_error}")
                 # Fallback to mock if AI service fails
                 verdict = await self._generate_mock_verdict(target_message, ctx)
@@ -201,7 +222,7 @@ class FactCheckCommand(PublicCommand):
         """Convert AI analysis response to verdict format."""
         
         # Parse AI response for verdict category
-        analysis_lower = analysis.lower().strip()
+        analysis_lower = analysis.get('fact-check','false').lower().strip()
         
         # Determine category based on AI response
         if "true" in analysis_lower and "false" not in analysis_lower:
@@ -215,7 +236,22 @@ class FactCheckCommand(PublicCommand):
             category = "needs_investigation"
         
         # Get persona-specific response using the same format as mock
-        persona = ctx.server_config.persona
+        # Fetch persona from database using container if ctx.server_config is None
+        persona = "sassy_reporter"  # Default fallback
+        if ctx.server_config and ctx.server_config.persona:
+            persona = ctx.server_config.persona
+        else:
+            # Try to get server config from database
+            try:
+                server_repo = ctx.container.get_server_repository()
+                server_config = await server_repo.get_by_server_id_partition(str(ctx.guild_id))
+                if not server_config:
+                    server_config = await server_repo.get_by_server_id(str(ctx.guild_id))
+                
+                if server_config and server_config.persona:
+                    persona = server_config.persona
+            except Exception as e:
+                logger.warning(f"Failed to fetch server config for persona: {e}")
         
         # Define verdict structure (same as mock)
         verdicts = {
@@ -349,7 +385,22 @@ class FactCheckCommand(PublicCommand):
             selected_category = 'needs_investigation'
         
         # Generate response based on category and persona
-        persona = ctx.server_config.persona
+        # Fetch persona from database using container if ctx.server_config is None
+        persona = "sassy_reporter"  # Default fallback
+        if ctx.server_config and ctx.server_config.persona:
+            persona = ctx.server_config.persona
+        else:
+            # Try to get server config from database
+            try:
+                server_repo = ctx.container.get_server_repository()
+                server_config = await server_repo.get_by_server_id_partition(str(ctx.guild_id))
+                if not server_config:
+                    server_config = await server_repo.get_by_server_id(str(ctx.guild_id))
+                
+                if server_config and server_config.persona:
+                    persona = server_config.persona
+            except Exception as e:
+                logger.warning(f"Failed to fetch server config for persona: {e}")
         
         verdicts = {
             'true': {
@@ -506,6 +557,58 @@ class FactCheckCommand(PublicCommand):
         return embed
 
 
-# Register the command
+# Context menu command for right-click fact-check
+import discord
+from discord import app_commands
+
+@app_commands.context_menu(name='Fact Check')
+async def fact_check_context_menu(interaction: discord.Interaction, message: discord.Message):
+    """Context menu command for fact-checking messages."""
+    # Import here to avoid circular imports
+    from src.core.dependencies import get_container
+    from src.discord_bot.commands.base import CommandContext
+    
+    # Create a context object similar to slash commands
+    container = await get_container()
+    server_repo = container.get_server_repository()
+    
+    # Try to get server config using partition method first
+    try:
+        server_config = await server_repo.get_by_server_id_partition(str(interaction.guild_id))
+        if not server_config:
+            # Fallback to regular method
+            server_config = await server_repo.get_by_server_id(str(interaction.guild_id))
+    except Exception:
+        server_config = await server_repo.get_by_server_id(str(interaction.guild_id))
+    
+    # If still no config, create a default one
+    if not server_config:
+        from src.models.server import PersonaType, ServerStatus
+        # Create minimal server config for the command to work
+        server_config = type('ServerConfig', (), {
+            'persona': PersonaType.SASSY_REPORTER,
+            'status': ServerStatus.ACTIVE,
+            'server_id': str(interaction.guild_id),
+            'server_name': interaction.guild.name if interaction.guild else 'Unknown Server'
+        })()
+    
+    # Create context
+    ctx = CommandContext(
+        interaction=interaction,
+        container=container,
+        server_config=server_config
+    )
+    
+    # Create fact check command instance and execute
+    fact_check_cmd = FactCheckCommand()
+    
+    # Use the target message ID from the context menu
+    await fact_check_cmd.execute(ctx, message_id=str(message.id))
+
+
+# Register the commands
 from src.discord_bot.commands.base import command_registry
 command_registry.register(FactCheckCommand())
+
+# Note: Context menu commands need to be registered separately in the bot setup
+# This is handled in the bot.py file during command sync

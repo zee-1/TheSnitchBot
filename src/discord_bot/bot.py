@@ -103,6 +103,16 @@ class SnitchBot(commands.Bot):
         
         self.is_ready = True
         logger.info("The Snitch is now online and ready!")
+        
+        # Send startup notifications to bot updates channels
+        try:
+            server_repo = self.container.get_server_repository()
+            all_server_configs = await server_repo.get_active_servers()
+            
+            from src.discord_bot.utils.channel_utils import send_startup_notification
+            await send_startup_notification(all_server_configs)
+        except Exception as e:
+            logger.error(f"Failed to send startup notifications: {e}")
     
     async def on_guild_join(self, guild: discord.Guild):
         """Called when the bot joins a new guild."""
@@ -209,15 +219,48 @@ class SnitchBot(commands.Bot):
         
         logger.info(f"Registered {len(registered_commands)} commands locally: {registered_commands}")
         
+        # Register context menu commands
+        await self._register_context_menus()
+        
         # Sync commands with Discord
         try:
             logger.info("Syncing commands with Discord...")
-            synced = await self.tree.sync()
-            logger.info(f"Successfully synced {len(synced)} slash commands with Discord")
+            
+            # For development: sync to current guild for immediate testing
+            # For production: sync globally (takes up to 1 hour)
+            if self.settings.environment == "development" and self.guilds:
+                # Sync to first guild for faster testing
+                test_guild = self.guilds[0]
+                synced = await self.tree.sync(guild=test_guild)
+                logger.info(f"Successfully synced {len(synced)} commands to guild {test_guild.name} for testing")
+                
+                # Also sync globally for other guilds
+                synced_global = await self.tree.sync()
+                logger.info(f"Successfully synced {len(synced_global)} commands globally")
+            else:
+                # Production: sync globally only
+                synced = await self.tree.sync()
+                logger.info(f"Successfully synced {len(synced)} slash commands with Discord")
+            
             logger.info(f"Synced commands: {[cmd.name for cmd in synced]}")
         except Exception as e:
             logger.error(f"Failed to sync commands with Discord: {e}", exc_info=True)
             raise
+    
+    async def _register_context_menus(self):
+        """Register context menu commands."""
+        try:
+            from src.discord_bot.commands.fact_check import fact_check_context_menu
+            from src.discord_bot.commands.controversy_check import controversy_check_context_menu
+            
+            # Add context menu commands to the tree
+            self.tree.add_command(fact_check_context_menu)
+            self.tree.add_command(controversy_check_context_menu)
+            
+            logger.info("Registered context menus: Fact Check, Controversy Check")
+            
+        except Exception as e:
+            logger.error(f"Failed to register context menus: {e}", exc_info=True)
     
     def _create_command_callback(self, command_instance):
         """Create a callback function for a slash command."""

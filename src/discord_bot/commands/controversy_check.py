@@ -246,7 +246,12 @@ class ControversyCheckCommand(PublicCommand):
                 inline=False
             )
             
-            embed.set_footer(text=f"Analyzed by {ctx.server_config.persona.replace('_', ' ').title()}")
+            # Set footer with persona (with fallback)
+            try:
+                persona_name = ctx.server_config.persona.replace('_', ' ').title() if ctx.server_config and ctx.server_config.persona else "Sassy Reporter"
+                embed.set_footer(text=f"Analyzed by {persona_name}")
+            except AttributeError:
+                embed.set_footer(text="Analyzed by Sassy Reporter")
             
             await ctx.respond(embed=embed)
             
@@ -351,6 +356,55 @@ class ControversyCheckCommand(PublicCommand):
             "related_messages_count": len(context_messages),
             "analysis_method": "mock_heuristic"
         }
+
+
+# Context menu command for right-click controversy check
+import discord
+from discord import app_commands
+
+@app_commands.context_menu(name='Controversy Check')
+async def controversy_check_context_menu(interaction: discord.Interaction, message: discord.Message):
+    """Context menu command for checking message controversy."""
+    # Import here to avoid circular imports
+    from src.core.dependencies import get_container
+    from src.discord_bot.commands.base import CommandContext
+    
+    # Create a context object similar to slash commands
+    container = await get_container()
+    server_repo = container.get_server_repository()
+    
+    # Try to get server config using partition method first
+    try:
+        server_config = await server_repo.get_by_server_id_partition(str(interaction.guild_id))
+        if not server_config:
+            # Fallback to regular method
+            server_config = await server_repo.get_by_server_id(str(interaction.guild_id))
+    except Exception:
+        server_config = await server_repo.get_by_server_id(str(interaction.guild_id))
+    
+    # If still no config, create a default one
+    if not server_config:
+        from src.models.server import PersonaType, ServerStatus
+        # Create minimal server config for the command to work
+        server_config = type('ServerConfig', (), {
+            'persona': PersonaType.SASSY_REPORTER,
+            'status': ServerStatus.ACTIVE,
+            'server_id': str(interaction.guild_id),
+            'server_name': interaction.guild.name if interaction.guild else 'Unknown Server'
+        })()
+    
+    # Create context
+    ctx = CommandContext(
+        interaction=interaction,
+        container=container,
+        server_config=server_config
+    )
+    
+    # Create controversy check command instance and execute
+    controversy_cmd = ControversyCheckCommand()
+    
+    # Use the target message ID from the context menu
+    await controversy_cmd.execute(ctx, message_id=str(message.id))
 
 
 # Register the command

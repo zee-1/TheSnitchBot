@@ -333,6 +333,338 @@ class SetNewsTimeCommand(AdminCommand):
             logger.error(f"Error in set-news-time command: {e}", exc_info=True)
 
 
+class SetOutputChannelCommand(AdminCommand):
+    """Command to set the output channel for command responses."""
+    
+    def __init__(self):
+        super().__init__(
+            name="set-output-channel",
+            description="Set the channel where command outputs (breaking news, leaks, etc.) will be sent",
+            cooldown_seconds=10
+        )
+    
+    async def validate_arguments(self, ctx: CommandContext, **kwargs) -> Dict[str, Any]:
+        """Validate command arguments."""
+        validated = {}
+        
+        channel = kwargs.get('channel')
+        if not channel:
+            # Use current channel if none specified
+            validated['channel_id'] = ctx.channel_id
+        else:
+            # Handle channel mention or ID
+            if isinstance(channel, discord.TextChannel):
+                validated['channel_id'] = str(channel.id)
+            else:
+                # Try to parse as channel mention or ID
+                channel_str = str(channel)
+                # Remove <# and > if it's a mention
+                channel_match = re.match(r'<#(\d+)>', channel_str)
+                if channel_match:
+                    validated['channel_id'] = channel_match.group(1)
+                else:
+                    # Assume it's a channel ID
+                    try:
+                        validated['channel_id'] = validate_discord_id(channel_str, 'channel')
+                    except Exception as e:
+                        raise InvalidCommandArgumentError(
+                            self.name,
+                            'channel',
+                            f'Invalid channel format: {e}'
+                        )
+        
+        return validated
+    
+    async def execute(self, ctx: CommandContext, **kwargs) -> None:
+        """Execute the set output channel command."""
+        channel_id = kwargs['channel_id']
+        
+        logger.info(
+            "Set output channel command executed",
+            user_id=ctx.user_id,
+            guild_id=ctx.guild_id,
+            new_channel_id=channel_id
+        )
+        
+        try:
+            # Verify channel exists and bot has permissions
+            settings = ctx.container.get_settings()
+            from src.discord_bot.client import get_discord_client
+            discord_client = await get_discord_client(settings)
+            
+            channel = await discord_client.get_channel(channel_id)
+            if not channel:
+                embed = EmbedBuilder.error(
+                    "Channel Not Found",
+                    f"Could not find channel with ID `{channel_id}`."
+                )
+                await ctx.respond(embed=embed)
+                return
+            
+            # Check permissions
+            required_permissions = [
+                "send_messages", "embed_links", "attach_files", "add_reactions"
+            ]
+            
+            permissions = await discord_client.check_permissions(
+                ctx.guild_id, channel_id, required_permissions
+            )
+            
+            missing_permissions = [
+                perm for perm, has_perm in permissions.items() if not has_perm
+            ]
+            
+            if missing_permissions:
+                embed = EmbedBuilder.warning(
+                    "Missing Permissions",
+                    f"I don't have the following permissions in {channel.mention}:\n"
+                    f"```{', '.join(missing_permissions)}```\n"
+                    f"Please grant these permissions and try again."
+                )
+                await ctx.respond(embed=embed)
+                return
+            
+            # Update server configuration
+            server_repo = ctx.container.get_server_repository()
+            server_config = await server_repo.get_by_server_id(ctx.guild_id)
+            
+            if server_config:
+                server_config.set_output_channel(channel_id)
+                await server_repo.update(server_config)
+                
+                embed = EmbedBuilder.success(
+                    "Output Channel Updated",
+                    f"Command outputs will now be sent to {channel.mention}! 📤\n\n"
+                    f"This affects: Breaking News, Leak commands, and other bot responses."
+                )
+                
+                embed.add_field(
+                    name="📋 Affected Commands",
+                    value="• `/breaking-news`\n• `/leak`\n• Other command responses",
+                    inline=True
+                )
+                
+                embed.add_field(
+                    name="📋 Required Permissions",
+                    value="✅ Send Messages\n✅ Embed Links\n✅ Attach Files\n✅ Add Reactions",
+                    inline=True
+                )
+                
+            else:
+                embed = EmbedBuilder.error(
+                    "Update Failed",
+                    "Failed to update output channel. Please try again."
+                )
+            
+            await ctx.respond(embed=embed)
+            
+        except Exception as e:
+            embed = EmbedBuilder.error(
+                "Command Failed",
+                "An error occurred while updating the output channel."
+            )
+            await ctx.respond(embed=embed)
+            logger.error(f"Error in set-output-channel command: {e}", exc_info=True)
+
+
+class SetBotUpdatesChannelCommand(AdminCommand):
+    """Command to set the bot updates channel."""
+    
+    def __init__(self):
+        super().__init__(
+            name="set-bot-updates-channel",
+            description="Set the channel where bot status updates and notifications will be sent",
+            cooldown_seconds=10
+        )
+    
+    async def validate_arguments(self, ctx: CommandContext, **kwargs) -> Dict[str, Any]:
+        """Validate command arguments."""
+        validated = {}
+        
+        channel = kwargs.get('channel')
+        if not channel:
+            # Use current channel if none specified
+            validated['channel_id'] = ctx.channel_id
+        else:
+            # Handle channel mention or ID
+            if isinstance(channel, discord.TextChannel):
+                validated['channel_id'] = str(channel.id)
+            else:
+                # Try to parse as channel mention or ID
+                channel_str = str(channel)
+                # Remove <# and > if it's a mention
+                channel_match = re.match(r'<#(\d+)>', channel_str)
+                if channel_match:
+                    validated['channel_id'] = channel_match.group(1)
+                else:
+                    # Assume it's a channel ID
+                    try:
+                        validated['channel_id'] = validate_discord_id(channel_str, 'channel')
+                    except Exception as e:
+                        raise InvalidCommandArgumentError(
+                            self.name,
+                            'channel',
+                            f'Invalid channel format: {e}'
+                        )
+        
+        return validated
+    
+    async def execute(self, ctx: CommandContext, **kwargs) -> None:
+        """Execute the set bot updates channel command."""
+        channel_id = kwargs['channel_id']
+        
+        logger.info(
+            "Set bot updates channel command executed",
+            user_id=ctx.user_id,
+            guild_id=ctx.guild_id,
+            new_channel_id=channel_id
+        )
+        
+        try:
+            # Verify channel exists and bot has permissions
+            settings = ctx.container.get_settings()
+            from src.discord_bot.client import get_discord_client
+            discord_client = await get_discord_client(settings)
+            
+            channel = await discord_client.get_channel(channel_id)
+            if not channel:
+                embed = EmbedBuilder.error(
+                    "Channel Not Found",
+                    f"Could not find channel with ID `{channel_id}`."
+                )
+                await ctx.respond(embed=embed)
+                return
+            
+            # Check permissions
+            required_permissions = [
+                "send_messages", "embed_links", "attach_files"
+            ]
+            
+            permissions = await discord_client.check_permissions(
+                ctx.guild_id, channel_id, required_permissions
+            )
+            
+            missing_permissions = [
+                perm for perm, has_perm in permissions.items() if not has_perm
+            ]
+            
+            if missing_permissions:
+                embed = EmbedBuilder.warning(
+                    "Missing Permissions",
+                    f"I don't have the following permissions in {channel.mention}:\n"
+                    f"```{', '.join(missing_permissions)}```\n"
+                    f"Please grant these permissions and try again."
+                )
+                await ctx.respond(embed=embed)
+                return
+            
+            # Update server configuration
+            server_repo = ctx.container.get_server_repository()
+            server_config = await server_repo.get_by_server_id(ctx.guild_id)
+            
+            if server_config:
+                server_config.set_bot_updates_channel(channel_id)
+                await server_repo.update(server_config)
+                
+                embed = EmbedBuilder.success(
+                    "Bot Updates Channel Updated",
+                    f"Bot status updates will now be sent to {channel.mention}! 🤖\n\n"
+                    f"This includes startup notifications, errors, and status messages."
+                )
+                
+                embed.add_field(
+                    name="📋 Update Types",
+                    value="• Bot startup/shutdown\n• Error notifications\n• Feature updates\n• Maintenance notices",
+                    inline=True
+                )
+                
+                embed.add_field(
+                    name="📋 Required Permissions",
+                    value="✅ Send Messages\n✅ Embed Links\n✅ Attach Files",
+                    inline=True
+                )
+                
+            else:
+                embed = EmbedBuilder.error(
+                    "Update Failed",
+                    "Failed to update bot updates channel. Please try again."
+                )
+            
+            await ctx.respond(embed=embed)
+            
+        except Exception as e:
+            embed = EmbedBuilder.error(
+                "Command Failed",
+                "An error occurred while updating the bot updates channel."
+            )
+            await ctx.respond(embed=embed)
+            logger.error(f"Error in set-bot-updates-channel command: {e}", exc_info=True)
+
+
+class SyncCommandsCommand(AdminCommand):
+    """Command to manually sync slash commands with Discord."""
+    
+    def __init__(self):
+        super().__init__(
+            name="sync-commands",
+            description="Manually sync slash commands with Discord (admin only)",
+            cooldown_seconds=30
+        )
+    
+    async def execute(self, ctx: CommandContext, **kwargs) -> None:
+        """Execute the sync commands command."""
+        
+        logger.info(
+            "Sync commands command executed",
+            user_id=ctx.user_id,
+            guild_id=ctx.guild_id
+        )
+        
+        try:
+            # Get the bot instance
+            bot = ctx.interaction.client
+            
+            # Sync commands
+            synced_guild = await bot.tree.sync(guild=ctx.interaction.guild)
+            synced_global = await bot.tree.sync()
+            
+            embed = EmbedBuilder.success(
+                "Commands Synced",
+                f"Successfully synced commands with Discord!\n\n"
+                f"**Guild Sync:** {len(synced_guild)} commands\n"
+                f"**Global Sync:** {len(synced_global)} commands"
+            )
+            
+            embed.add_field(
+                name="📋 Synced Commands",
+                value="\n".join([f"• `/{cmd.name}`" for cmd in synced_guild[:10]]),  # Show first 10
+                inline=False
+            )
+            
+            if len(synced_guild) > 10:
+                embed.add_field(
+                    name="📝 Note",
+                    value=f"And {len(synced_guild) - 10} more commands...",
+                    inline=False
+                )
+            
+            embed.add_field(
+                name="⏱️ Availability",
+                value="Guild commands: **Immediate**\nGlobal commands: **Up to 1 hour**",
+                inline=False
+            )
+            
+            await ctx.respond(embed=embed)
+            
+        except Exception as e:
+            embed = EmbedBuilder.error(
+                "Sync Failed",
+                f"Failed to sync commands: {str(e)}"
+            )
+            await ctx.respond(embed=embed)
+            logger.error(f"Error in sync-commands command: {e}", exc_info=True)
+
+
 class ServerStatusCommand(AdminCommand):
     """Command to view server configuration status."""
     
@@ -392,6 +724,34 @@ class ServerStatusCommand(AdminCommand):
             else:
                 embed.add_field(
                     name="📍 Newsletter Channel",
+                    value="⚠️ Not configured",
+                    inline=True
+                )
+            
+            # Output channel
+            if server_config.output_channel_id:
+                embed.add_field(
+                    name="📤 Output Channel",
+                    value=f"<#{server_config.output_channel_id}>",
+                    inline=True
+                )
+            else:
+                embed.add_field(
+                    name="📤 Output Channel",
+                    value="⚠️ Uses command channel",
+                    inline=True
+                )
+            
+            # Bot updates channel
+            if server_config.bot_updates_channel_id:
+                embed.add_field(
+                    name="🤖 Bot Updates Channel",
+                    value=f"<#{server_config.bot_updates_channel_id}>",
+                    inline=True
+                )
+            else:
+                embed.add_field(
+                    name="🤖 Bot Updates Channel",
                     value="⚠️ Not configured",
                     inline=True
                 )
@@ -468,6 +828,9 @@ from src.discord_bot.commands.base import command_registry
 command_registry.register(SetPersonaCommand())
 command_registry.register(SetNewsChannelCommand())
 command_registry.register(SetNewsTimeCommand())
+command_registry.register(SetOutputChannelCommand())
+command_registry.register(SetBotUpdatesChannelCommand())
+command_registry.register(SyncCommandsCommand())
 command_registry.register(ServerStatusCommand())
 
 

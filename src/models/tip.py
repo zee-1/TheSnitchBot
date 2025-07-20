@@ -111,7 +111,7 @@ class Tip(CosmosDBEntity):
         """Get age of tip in hours."""
         if not self.created_at:
             return 0
-        delta = datetime.now() - datetime.strptime(self.created_at,format=r'%Y-%m-%dT%H:%M:%S.%f%z')
+        delta = datetime.now() - datetime.strptime(self.created_at,r'%Y-%m-%dT%H:%M:%S.%f%z')
         return delta.total_seconds() / 3600
     
     @property

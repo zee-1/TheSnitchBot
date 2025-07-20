@@ -128,7 +128,13 @@ class LeakCommand(PublicCommand):
                 icon_url=ctx.interaction.client.user.avatar.url if ctx.interaction.client.user.avatar else None
             )
             
-            await ctx.respond(embed=embed)
+            # Send to configured output channel or current channel
+            from src.discord_bot.utils.channel_utils import send_to_output_channel
+            await send_to_output_channel(
+                ctx, 
+                embed, 
+                "The leak has been delivered"
+            )
             
             # Add mysterious emoji reaction
             try:
@@ -230,7 +236,7 @@ XYZ Found playing with barbie in local park, police investigating.
         # model: Optional[str] = None
             leak_content = await ai_service.groq_client.simple_completion(
                 prompt=prompt,
-                temperature=0.4,
+                temperature=0.8,
                 max_tokens=150
             )
             

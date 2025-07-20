@@ -166,19 +166,6 @@ safety==2.3.4
 # PLATFORM-SPECIFIC DEPENDENCIES
 # =============================================================================
 # Windows Support
-pywin32==307; sys_platform == "win32"
-
-# Linux Support  
-python-systemd==235; sys_platform == "linux"
-
-# macOS Support
-pyobjc-framework-Cocoa==10.1; sys_platform == "darwin"
-
-# =============================================================================
-# ASYNC RUNTIME OPTIMIZATION
-# =============================================================================
-uvloop==0.19.0; sys_platform != "win32"
-
 # =============================================================================
 # OPTIONAL: ADDITIONAL CLOUD PROVIDERS
 # =============================================================================

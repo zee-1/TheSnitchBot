@@ -46,6 +46,10 @@ class ServerConfig(CosmosDBEntity):
     newsletter_timezone: str = Field("UTC", description="Timezone for newsletter scheduling")
     last_newsletter_sent: Optional[str] = Field(None, description="Last newsletter timestamp (ISO format)")
     
+    # Channel settings
+    output_channel_id: Optional[str] = Field(None, description="Channel for command outputs (breaking news, leaks, etc)")
+    bot_updates_channel_id: Optional[str] = Field(None, description="Channel for bot status updates and notifications")
+    
     # Content settings
     max_messages_analysis: int = Field(1000, description="Max messages to analyze for newsletter")
     controversy_threshold: float = Field(0.5, description="Threshold for controversy scoring")
@@ -93,12 +97,12 @@ class ServerConfig(CosmosDBEntity):
             raise ValueError("Owner ID must be a valid Discord snowflake")
         return v
     
-    @field_validator("newsletter_channel_id")
+    @field_validator("newsletter_channel_id", "output_channel_id", "bot_updates_channel_id")
     @classmethod
-    def validate_newsletter_channel_id(cls, v):
+    def validate_channel_ids(cls, v):
         """Validate Discord channel ID format."""
         if v is not None and not v.isdigit():
-            raise ValueError("Newsletter channel ID must be a valid Discord snowflake")
+            raise ValueError("Channel ID must be a valid Discord snowflake")
         return v
     
     @field_validator("admin_users", "moderator_users", "whitelisted_channels")
@@ -146,6 +150,24 @@ class ServerConfig(CosmosDBEntity):
         if not self.whitelisted_channels:
             return True
         return channel_id in self.whitelisted_channels
+    
+    def get_output_channel(self) -> Optional[str]:
+        """Get the configured output channel for command responses."""
+        return self.output_channel_id
+    
+    def get_bot_updates_channel(self) -> Optional[str]:
+        """Get the configured bot updates channel."""
+        return self.bot_updates_channel_id
+    
+    def set_output_channel(self, channel_id: Optional[str]) -> None:
+        """Set the output channel for command responses."""
+        self.output_channel_id = channel_id
+        self.update_timestamp()
+    
+    def set_bot_updates_channel(self, channel_id: Optional[str]) -> None:
+        """Set the bot updates channel."""
+        self.bot_updates_channel_id = channel_id
+        self.update_timestamp()
     
     def add_admin(self, user_id: str) -> None:
         """Add user to admin list."""

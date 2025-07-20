@@ -272,30 +272,36 @@ class EmbeddingService:
             # Create query from message content
             query_text = self._prepare_message_text(message)
             
-            # Calculate time filter
+            # Calculate time filter - ChromaDB doesn't support complex nested operators
+            # We'll handle time filtering after the search
             msg_dt = message.timestamp_dt
-            time_filter = {
-                "timestamp": {
-                    "$gte": (msg_dt.timestamp() - (time_window_hours * 3600))
-                }
-            }
+            time_threshold = msg_dt.timestamp() - (time_window_hours * 3600)
             
-            # Search for similar messages
+            # Search for similar messages without time filter first
             related = await self.semantic_search(
                 query_text=query_text,
                 server_id=server_id,
-                limit=limit + 1,  # +1 to exclude the original message
-                min_similarity=0.4,
-                filters=time_filter
+                limit=limit + 20,  # Get more results to filter by time
+                min_similarity=0.4
             )
             
-            # Filter out the original message
-            related_messages = [
-                msg for msg in related 
-                if msg["message_id"] != message.message_id
-            ]
+            # Filter by time and exclude the original message
+            related_messages = []
+            for msg in related:
+                # Skip the original message
+                if msg["message_id"] == message.message_id:
+                    continue
+                
+                # Check time window
+                msg_timestamp = msg["metadata"].get("timestamp", 0)
+                if msg_timestamp >= time_threshold:
+                    related_messages.append(msg)
+                
+                # Stop when we have enough results
+                if len(related_messages) >= limit:
+                    break
             
-            return related_messages[:limit]
+            return related_messages
         
         except Exception as e:
             logger.error(f"Error finding related messages: {e}")
@@ -325,35 +331,37 @@ class EmbeddingService:
             # Get recent messages
             time_threshold = datetime.now().timestamp() - (time_window_hours * 3600)
             
+            # Get all messages for the server and filter by time afterwards
+            # ChromaDB doesn't support nested where operators
             recent_messages = self.collection.query(
                 query_texts=[""],  # Empty query to get all
                 n_results=500,  # Limit to recent messages
-                where={
-                    "server_id": server_id,
-                    "timestamp": {"$gte": time_threshold}
-                }
+                where={"server_id": server_id}
             )
             
             if not recent_messages["documents"] or not recent_messages["documents"][0]:
                 return []
             
+            # Filter messages by time threshold
+            filtered_messages = []
+            for doc, metadata in zip(recent_messages["documents"][0], recent_messages["metadatas"][0]):
+                if metadata.get("timestamp", 0) >= time_threshold:
+                    filtered_messages.append((doc, metadata))
+            
+            if not filtered_messages:
+                return []
+            
             # Simple trending analysis based on engagement
             topics = []
             
-            # Group messages by engagement and content similarity
-            messages_data = list(zip(
-                recent_messages["documents"][0],
-                recent_messages["metadatas"][0]
-            ))
-            
             # Sort by engagement score
-            messages_data.sort(
+            filtered_messages.sort(
                 key=lambda x: x[1]["engagement_score"],
                 reverse=True
             )
             
             # Take top engaging messages as topic representatives
-            for i, (content, metadata) in enumerate(messages_data[:limit]):
+            for i, (content, metadata) in enumerate(filtered_messages[:limit]):
                 topic = {
                     "topic_id": f"trending_{i+1}",
                     "representative_content": content[:100] + "..." if len(content) > 100 else content,
@@ -399,21 +407,27 @@ class EmbeddingService:
             # Calculate cutoff timestamp
             cutoff_time = datetime.now().timestamp() - (days_to_keep * 24 * 3600)
             
-            # Get old embeddings
-            old_embeddings = self.collection.query(
+            # Get all embeddings for the server and filter by time afterwards
+            # ChromaDB doesn't support nested where operators
+            all_embeddings = self.collection.query(
                 query_texts=[""],
-                n_results=10000,  # Large number to get all old ones
-                where={
-                    "server_id": server_id,
-                    "timestamp": {"$lt": cutoff_time}
-                }
+                n_results=10000,  # Large number to get all
+                where={"server_id": server_id}
             )
             
-            if old_embeddings["ids"] and old_embeddings["ids"][0]:
-                # Delete old embeddings
-                self.collection.delete(ids=old_embeddings["ids"][0])
+            if all_embeddings["ids"] and all_embeddings["ids"][0]:
+                # Filter to find old embeddings
+                old_ids = []
+                for i, metadata in enumerate(all_embeddings["metadatas"][0]):
+                    if metadata.get("timestamp", 0) < cutoff_time:
+                        old_ids.append(all_embeddings["ids"][0][i])
                 
-                removed_count = len(old_embeddings["ids"][0])
+                if old_ids:
+                    # Delete old embeddings
+                    self.collection.delete(ids=old_ids)
+                    removed_count = len(old_ids)
+                else:
+                    removed_count = 0
                 
                 logger.info(
                     "Old embeddings cleaned up",

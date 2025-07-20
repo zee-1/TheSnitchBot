@@ -230,7 +230,13 @@ class BreakingNewsCommand(PublicCommand):
             except:
                 pass  # Ignore if we can't add reaction
             
-            await ctx.respond(embed=embed)
+            # Send to configured output channel or current channel
+            from src.discord_bot.utils.channel_utils import send_to_output_channel
+            await send_to_output_channel(
+                ctx, 
+                embed, 
+                "Breaking news bulletin sent"
+            )
             
             logger.info(
                 "Breaking news generated successfully",

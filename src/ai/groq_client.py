@@ -255,6 +255,16 @@ class GroqClient:
         """
         
         analysis_prompts = {
+            "fact_check": f"""
+            Analyze the truthness of the content, where this content is true or not:
+            - fact-check: needs investigation,true  or false
+            - score: float between 0 (false fact) and 1 (absolute truth)
+            - confidence: float between 0 and 1
+            
+            Text: "{content}"
+            
+            Return only valid JSON:
+            """,
             "sentiment": f"""
             Analyze the sentiment of the following text. Return a JSON object with:
             - sentiment: "positive", "negative", or "neutral"
@@ -316,8 +326,29 @@ class GroqClient:
                 max_tokens=500
             )
             
-            # Try to parse JSON response
-            result = json.loads(response.strip())
+            # Clean and parse JSON response
+            # Handle cases where AI returns JSON wrapped in markdown code blocks
+            cleaned_response = response.strip()
+            
+            # Remove markdown code block markers if present
+            if cleaned_response.startswith('```json'):
+                # Find the end of the code block
+                end_marker = cleaned_response.find('```', 7)  # Start after '```json'
+                if end_marker != -1:
+                    cleaned_response = cleaned_response[7:end_marker].strip()
+                else:
+                    # If no closing ```, just remove the opening
+                    cleaned_response = cleaned_response[7:].strip()
+            elif cleaned_response.startswith('```'):
+                # Handle cases with just ``` without json
+                end_marker = cleaned_response.find('```', 3)
+                if end_marker != -1:
+                    cleaned_response = cleaned_response[3:end_marker].strip()
+                else:
+                    cleaned_response = cleaned_response[3:].strip()
+            
+            # Try to parse the cleaned JSON
+            result = json.loads(cleaned_response)
             
             logger.info(
                 "Content analysis completed",
@@ -331,7 +362,12 @@ class GroqClient:
         except json.JSONDecodeError as e:
             # Safely log without Unicode issues
             response_preview = response[:100] if response else "<empty>"
-            logger.error(f"Failed to parse analysis JSON: {str(e)}, response preview: {repr(response_preview)}")
+            cleaned_preview = cleaned_response[:100] if 'cleaned_response' in locals() else "<not cleaned>"
+            logger.error(
+                f"Failed to parse analysis JSON: {str(e)}, "
+                f"original response preview: {repr(response_preview)}, "
+                f"cleaned response preview: {repr(cleaned_preview)}"
+            )
             # Return default values
             return {
                 f"{analysis_type}_score": 0.0,

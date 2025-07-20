@@ -222,9 +222,9 @@ class CosmosDBClient:
                     max_item_count=max_item_count
                 )
             else:
+                # Cross-partition queries are now enabled by default when no partition_key is provided
                 items = container.query_items(
                     query=query_spec,
-                    enable_cross_partition_query=True,
                     max_item_count=max_item_count
                 )
             
