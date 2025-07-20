@@ -124,7 +124,6 @@ class BreakingNewsCommand(PublicCommand):
             try:
                 from src.ai import get_ai_service
                 ai_service = await get_ai_service()
-                
                 # Use mock responses if enabled in settings
                 settings = ctx.container.get_settings()
                 if settings.mock_ai_responses:
@@ -147,7 +146,7 @@ class BreakingNewsCommand(PublicCommand):
             embed = EmbedBuilder.newsletter(
                 title="🚨 BREAKING NEWS",
                 content=bulletin,
-                author_name=f"The Snitch • {ctx.server_config.persona.value.replace('_', ' ').title()}"
+                author_name=f"The Snitch • {ctx.server_config.persona.replace('_', ' ').title()}"
             )
             
             # Add footer with analysis info

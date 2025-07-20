@@ -90,6 +90,10 @@ class Message(CosmosDBEntity):
     flagged_for_review: bool = Field(False, description="Whether flagged for human review")
     excluded_from_analysis: bool = Field(False, description="Whether to exclude from analysis")
     
+    # Discord attachments and embeds
+    attachments: List[str] = Field(default_factory=list, description="List of attachment URLs")
+    embeds: List[Dict[str, Any]] = Field(default_factory=list, description="List of message embeds")
+    
     # Embeddings and vector data
     embedding_id: Optional[str] = Field(None, description="ChromaDB embedding document ID")
     
