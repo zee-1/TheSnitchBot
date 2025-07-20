@@ -83,11 +83,11 @@ class ContentCommands(app_commands.Group):
                 pass  # Ignore if we can't send error message
     
     @app_commands.command(name="fact-check", description="Fact-check a message with a humorous verdict")
-    @app_commands.describe(message_id="ID of the message to fact-check")
+    @app_commands.describe(message_id="Message ID (or right-click message and use Apps > fact-check)")
     async def fact_check(
         self,
         interaction: discord.Interaction,
-        message_id: str
+        message_id: Optional[str] = None
     ):
         """Fact-check a message with a humorous verdict."""
         try:
@@ -159,11 +159,11 @@ class ContentCommands(app_commands.Group):
                 pass  # Ignore if we can't send error message
     
     @app_commands.command(name="controversy-check", description="Check how controversial a message is using AI")
-    @app_commands.describe(message_id="ID of the message to analyze for controversy")
+    @app_commands.describe(message_id="Message ID (or right-click message and use Apps > controversy-check)")
     async def controversy_check(
         self,
         interaction: discord.Interaction,
-        message_id: str
+        message_id: Optional[str] = None
     ):
         """Check how controversial a message is using AI analysis."""
         try:

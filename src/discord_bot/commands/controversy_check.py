@@ -31,13 +31,41 @@ class ControversyCheckCommand(PublicCommand):
         return {
             "message_id": {
                 "type": str,
-                "description": "ID of the message to analyze for controversy",
-                "required": True
+                "description": "Message ID (or right-click on message and use Apps > controversy-check)",
+                "required": False,
+                "default": None
             }
         }
     
-    async def execute(self, ctx: CommandContext, message_id: str) -> None:
+    async def execute(self, ctx: CommandContext, message_id: str = None) -> None:
         """Execute the controversy check command."""
+        
+        # Handle different ways the command can be used
+        target_message_id = None
+        
+        # Method 1: Check if it's a context menu command (right-click Apps)
+        if hasattr(ctx.interaction, 'data') and ctx.interaction.data.get('resolved', {}).get('messages'):
+            resolved_messages = ctx.interaction.data['resolved']['messages']
+            target_message_id = list(resolved_messages.keys())[0]
+            
+        # Method 2: Check if message_id parameter was provided
+        elif message_id:
+            target_message_id = message_id
+            
+        # Method 3: No message specified - show help
+        else:
+            embed = EmbedBuilder.warning(
+                "How to Use Controversy Check",
+                "🤔 **You need to specify which message to analyze!**\n\n"
+                "**Option 1 (Recommended):**\n"
+                "Right-click on any message → **Apps** → **controversy-check**\n\n"
+                "**Option 2:**\n"
+                "Copy a message ID and use `/content controversy-check message_id:[paste ID]`\n\n"
+                "**To get a message ID:**\n"
+                "Enable Developer Mode in Discord settings, then right-click message → Copy Message ID"
+            )
+            await ctx.respond(embed=embed, ephemeral=True)
+            return
         
         logger.info(
             "Controversy check command executed",
@@ -45,7 +73,7 @@ class ControversyCheckCommand(PublicCommand):
                 "user_id": ctx.user_id,
                 "guild_id": ctx.guild_id,
                 "channel_id": ctx.channel_id,
-                "target_message_id": message_id
+                "target_message_id": target_message_id
             }
         )
         
@@ -61,11 +89,11 @@ class ControversyCheckCommand(PublicCommand):
                 return
                 
             try:
-                target_message = await channel.fetch_message(int(message_id))
+                target_message = await channel.fetch_message(int(target_message_id))
             except discord.NotFound:
                 embed = EmbedBuilder.warning(
                     "Message Not Found",
-                    f"Could not find message with ID `{message_id}` in this channel."
+                    f"Could not find the target message in this channel."
                 )
                 await ctx.respond(embed=embed, ephemeral=True)
                 return
@@ -243,7 +271,7 @@ class ControversyCheckCommand(PublicCommand):
                 extra={
                     "user_id": ctx.user_id,
                     "guild_id": ctx.guild_id,
-                    "target_message_id": message_id,
+                    "target_message_id": target_message_id,
                     "controversy_score": controversy_score,
                     "confidence": confidence,
                     "context_messages": len(context_messages)

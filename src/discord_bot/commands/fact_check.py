@@ -31,8 +31,9 @@ class FactCheckCommand(PublicCommand):
         return {
             "message_id": {
                 "type": str,
-                "description": "ID of the message to fact-check",
-                "required": True
+                "description": "Message ID (or right-click on message and use Apps > fact-check)",
+                "required": False,
+                "default": None
             }
         }
     
@@ -61,15 +62,42 @@ class FactCheckCommand(PublicCommand):
         
         return validated
     
-    async def execute(self, ctx: CommandContext, message_id: str) -> None:
+    async def execute(self, ctx: CommandContext, message_id: str = None) -> None:
         """Execute the fact-check command."""
+        
+        # Handle different ways the command can be used
+        target_message_id = None
+        
+        # Method 1: Check if it's a context menu command (right-click Apps)
+        if hasattr(ctx.interaction, 'data') and ctx.interaction.data.get('resolved', {}).get('messages'):
+            resolved_messages = ctx.interaction.data['resolved']['messages']
+            target_message_id = list(resolved_messages.keys())[0]
+            
+        # Method 2: Check if message_id parameter was provided
+        elif message_id:
+            target_message_id = message_id
+            
+        # Method 3: No message specified - show help
+        else:
+            embed = EmbedBuilder.warning(
+                "How to Use Fact-Check",
+                "🤔 **You need to specify which message to fact-check!**\n\n"
+                "**Option 1 (Recommended):**\n"
+                "Right-click on any message → **Apps** → **fact-check**\n\n"
+                "**Option 2:**\n"
+                "Copy a message ID and use `/content fact-check message_id:[paste ID]`\n\n"
+                "**To get a message ID:**\n"
+                "Enable Developer Mode in Discord settings, then right-click message → Copy Message ID"
+            )
+            await ctx.respond(embed=embed, ephemeral=True)
+            return
         
         logger.info(
             "Fact-check command executed",
             user_id=ctx.user_id,
             guild_id=ctx.guild_id,
             channel_id=ctx.channel_id,
-            target_message_id=message_id
+            target_message_id=target_message_id
         )
         
         try:
@@ -84,11 +112,11 @@ class FactCheckCommand(PublicCommand):
                 return
                 
             try:
-                target_message = await channel.fetch_message(int(message_id))
+                target_message = await channel.fetch_message(int(target_message_id))
             except discord.NotFound:
                 embed = EmbedBuilder.warning(
                     "Message Not Found",
-                    f"Could not find message with ID `{message_id}` in this channel."
+                    f"Could not find the target message in this channel."
                 )
                 await ctx.respond(embed=embed, ephemeral=True)
                 return
@@ -113,6 +141,7 @@ class FactCheckCommand(PublicCommand):
             
             # Generate fact-check verdict
             try:
+                settings = ctx.container.get_settings()
                 if settings.mock_ai_responses:
                     verdict = await self._generate_mock_verdict(target_message, ctx)
                 else:
@@ -143,15 +172,15 @@ class FactCheckCommand(PublicCommand):
             # Add reaction to original message
             try:
                 emoji = verdict['emoji']
-                await discord_client.add_reaction(ctx.channel_id, message_id, emoji)
+                await target_message.add_reaction(emoji)
             except Exception as e:
-                logger.warning(f"Failed to add reaction to message {message_id}: {e}")
+                logger.warning(f"Failed to add reaction to message {target_message_id}: {e}")
             
             logger.info(
                 "Fact-check completed",
                 user_id=ctx.user_id,
                 guild_id=ctx.guild_id,
-                target_message_id=message_id,
+                target_message_id=target_message_id,
                 verdict=verdict['category']
             )
             
@@ -447,10 +476,10 @@ class FactCheckCommand(PublicCommand):
         
         # Add author info
         try:
-            author = ctx.guild.get_member(int(message.author_id))
-            author_name = author.display_name if author else f"User {message.author_id}"
+            author = ctx.interaction.guild.get_member(int(message.author.id))
+            author_name = author.display_name if author else f"User {message.author.id}"
         except:
-            author_name = f"User {message.author_id}"
+            author_name = f"User {message.author.id}"
         
         embed.add_field(
             name="👤 Message Author",
@@ -460,7 +489,7 @@ class FactCheckCommand(PublicCommand):
         
         embed.add_field(
             name="📊 Fact-Check ID",
-            value=f"`{message.message_id[:8]}...`",
+            value=f"`{str(message.id)[:8]}...`",
             inline=True
         )
         
