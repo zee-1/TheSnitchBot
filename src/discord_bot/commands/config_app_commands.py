@@ -25,7 +25,7 @@ class ConfigCommands(app_commands.Group):
     async def _get_server_config(self, interaction: discord.Interaction):
         """Get server configuration and check admin permissions."""
         server_repo = self.container.get_server_repository()
-        server_config = await server_repo.get_by_server_id(str(interaction.guild_id))
+        server_config = await server_repo.get_by_server_id_partition(str(interaction.guild_id))
         
         if not server_config:
             # Create default config

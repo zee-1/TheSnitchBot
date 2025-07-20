@@ -24,6 +24,8 @@ import src.discord_bot.commands.breaking_news
 import src.discord_bot.commands.fact_check
 import src.discord_bot.commands.leak
 import src.discord_bot.commands.help_command
+import src.discord_bot.commands.tip_command
+import src.discord_bot.commands.controversy_check
 from src.models.server import ServerConfig, PersonaType
 from src.models.message import Message, ReactionData
 from src.ai import get_ai_service
@@ -159,6 +161,11 @@ class SnitchBot(commands.Bot):
         config_group = setup_config_commands(self, self.container)
         logger.info("Registered config command group")
         
+        # Register content commands with parameters
+        from src.discord_bot.commands.content_app_commands import setup_content_commands
+        await setup_content_commands(self.tree, self.container)
+        logger.info("Registered content command group")
+        
         # Register simple commands without parameters
         all_commands = command_registry.get_all_commands()
         logger.info(f"Found {len(all_commands)} simple commands to register")
@@ -167,9 +174,14 @@ class SnitchBot(commands.Bot):
         
         for command_instance in all_commands:
             try:
-                # Skip config commands as they're handled by the app command group
-                if command_instance.name.startswith("set-") or command_instance.name == "bot-status":
-                    logger.info(f"Skipping {command_instance.name} (handled by config group)")
+                # Skip commands that are handled by app command groups
+                if (command_instance.name.startswith("set-") or 
+                    command_instance.name == "bot-status" or
+                    command_instance.name == "breaking-news" or
+                    command_instance.name == "fact-check" or
+                    command_instance.name == "submit-tip" or
+                    command_instance.name == "controversy-check"):
+                    logger.info(f"Skipping {command_instance.name} (handled by app command group)")
                     continue
                     
                 logger.info(f"Registering command: {command_instance.name}")
