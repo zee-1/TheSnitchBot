@@ -60,6 +60,11 @@ class NewsletterPipeline:
                     "No messages provided for newsletter generation"
                 )
             
+            # Validate all messages are proper Message model instances
+            for i, msg in enumerate(messages):
+                if not isinstance(msg, Message):
+                    raise AIServiceError(f"Message {i} is not a proper Message model instance: {type(msg)}")
+            
             # Filter messages based on server configuration
             filtered_messages = self._filter_messages(messages, server_config)
             
@@ -282,7 +287,7 @@ class NewsletterPipeline:
         
         # Sort by relevance (engagement + controversy + recency)
         def relevance_score(msg: Message) -> float:
-            recency_hours = (datetime.now() - msg.timestamp).total_seconds() / 3600
+            recency_hours = (datetime.now() - msg.timestamp_dt).total_seconds() / 3600
             recency_factor = max(0, 1 - (recency_hours / 24))  # Decay over 24 hours
             
             return (

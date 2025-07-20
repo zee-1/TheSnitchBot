@@ -62,17 +62,11 @@ def api_retry(func):
             raise
     return wrapper
 
-class Message:
-    @staticmethod
-    def from_discord_message(discord_message, guild_id):
-        # This would convert a discord.Message to your custom Message model
-        return {"id": discord_message.id, "content": discord_message.content, "guild_id": guild_id}
+# Import the real Message model
+from src.models.message import Message
 
-class ServerConfig:
-    def __init__(self, server_id, newsletter_channel_id=None, whitelisted_channels=None):
-        self.server_id = server_id
-        self.newsletter_channel_id = newsletter_channel_id
-        self.whitelisted_channels = whitelisted_channels or []
+# Import the real ServerConfig model  
+from src.models.server import ServerConfig
 
 # --- End of Mock/Placeholder classes ---
 

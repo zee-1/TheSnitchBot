@@ -153,7 +153,7 @@ class StarReporterChain:
                 - Author: {anonymized_author}
                 - Reactions: {msg.total_reactions}
                 - Replies: {msg.reply_count}
-                - Timestamp: {msg.timestamp.strftime('%H:%M')}
+                - Timestamp: {msg.timestamp_dt.strftime('%H:%M')}
                 """
                 
                 quotes_section += quote_info
@@ -311,14 +311,14 @@ class StarReporterChain:
         # Sort by timestamp (most recent first) and engagement
         recent_messages = sorted(
             messages,
-            key=lambda m: (m.timestamp, m.calculate_engagement_score()),
+            key=lambda m: (m.timestamp_dt, m.calculate_engagement_score()),
             reverse=True
         )[:10]  # Top 10 most recent and engaging
         
         data_parts = []
         for i, msg in enumerate(recent_messages, 1):
             msg_data = f"""
-            Message {i} | {msg.timestamp.strftime('%H:%M')}
+            Message {i} | {msg.timestamp_dt.strftime('%H:%M')}
             Content: {msg.content[:100]}{'...' if len(msg.content) > 100 else ''}
             Engagement: {msg.total_reactions} reactions, {msg.reply_count} replies
             """

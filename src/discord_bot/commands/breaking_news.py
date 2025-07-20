@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 from src.discord_bot.commands.base import PublicCommand, CommandContext, EmbedBuilder
 from src.core.exceptions import InsufficientContentError, AIServiceError
 from src.core.logging import get_logger
+from src.models.message import Message
 
 logger = get_logger(__name__)
 
@@ -63,6 +64,55 @@ class BreakingNewsCommand(PublicCommand):
         
         return validated
     
+    async def _convert_discord_messages_to_message_models(
+        self, 
+        discord_messages: list, 
+        server_id: str
+    ) -> list[Message]:
+        """
+        Convert Discord message objects to our Message model instances.
+        
+        Args:
+            discord_messages: List of discord.Message objects
+            server_id: Discord server/guild ID
+            
+        Returns:
+            List of Message model instances
+        """
+        message_models = []
+        
+        for discord_msg in discord_messages:
+            try:
+                # Convert using the Message model's built-in method
+                message_model = Message.from_discord_message(discord_msg, server_id)
+                
+                # Populate reaction users properly (async operation)
+                for reaction_data in message_model.reactions:
+                    try:
+                        # Find the original reaction and get users
+                        discord_reaction = next(
+                            (r for r in discord_msg.reactions if str(r.emoji) == reaction_data.emoji), 
+                            None
+                        )
+                        if discord_reaction:
+                            users = []
+                            async for user in discord_reaction.users():
+                                users.append(str(user.id))
+                            reaction_data.users = users
+                            reaction_data.count = len(users)
+                    except Exception as e:
+                        logger.warning(f"Failed to populate reaction users for {reaction_data.emoji}: {e}")
+                
+                # Update calculated metrics
+                message_model.update_metrics()
+                message_models.append(message_model)
+                
+            except Exception as e:
+                logger.warning(f"Failed to convert Discord message {discord_msg.id}: {e}")
+                continue
+        
+        return message_models
+    
     async def execute(self, ctx: CommandContext, message_count: int = 50, time_window: int = 2) -> None:
         """Execute the breaking news command."""
         
@@ -106,16 +156,31 @@ class BreakingNewsCommand(PublicCommand):
                 return
             
             # Filter out very short messages (bot messages already filtered)
-            filtered_messages = [
+            filtered_discord_messages = [
                 msg for msg in messages 
                 if len(msg.content.strip()) > 10
             ]
             
-            if len(filtered_messages) < 3:
+            if len(filtered_discord_messages) < 3:
                 embed = EmbedBuilder.warning(
                     "Insufficient Content",
                     "Not enough meaningful messages to generate breaking news. "
                     "Try again when there's more discussion."
+                )
+                await ctx.respond(embed=embed)
+                return
+            
+            # Convert Discord messages to our Message model instances
+            filtered_messages = await self._convert_discord_messages_to_message_models(
+                filtered_discord_messages, 
+                ctx.guild_id
+            )
+            
+            if len(filtered_messages) < 3:
+                embed = EmbedBuilder.warning(
+                    "Conversion Error",
+                    "Failed to process enough messages for breaking news generation. "
+                    "Try again later."
                 )
                 await ctx.respond(embed=embed)
                 return
@@ -127,7 +192,7 @@ class BreakingNewsCommand(PublicCommand):
                 # Use mock responses if enabled in settings
                 settings = ctx.container.get_settings()
                 if settings.mock_ai_responses:
-                    bulletin = await self._generate_mock_bulletin(filtered_messages, ctx)
+                    bulletin = await self._generate_mock_bulletin(filtered_discord_messages, ctx)
                 else:
                     # Generate smart breaking news using AI service
                     bulletin = await ai_service.generate_smart_breaking_news(
@@ -140,7 +205,7 @@ class BreakingNewsCommand(PublicCommand):
             except Exception as ai_error:
                 logger.warning(f"AI service failed, falling back to mock: {ai_error}")
                 # Fallback to mock if AI service fails
-                bulletin = await self._generate_mock_bulletin(filtered_messages, ctx)
+                bulletin = await self._generate_mock_bulletin(filtered_discord_messages, ctx)
             
             # Create breaking news embed
             embed = EmbedBuilder.newsletter(

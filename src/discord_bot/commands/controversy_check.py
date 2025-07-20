@@ -123,35 +123,15 @@ class ControversyCheckCommand(PublicCommand):
             # Defer response since AI processing takes time
             await ctx.defer()
             
-            # Create Message object for AI analysis
-            message_obj = Message(
-                message_id=str(target_message.id),
-                channel_id=str(target_message.channel.id),
-                server_id=str(target_message.guild.id),
-                author_id=str(target_message.author.id),
-                content=target_message.content,
-                timestamp=target_message.created_at,
-                attachment_urls=[str(attachment.url) for attachment in target_message.attachments],
-                reaction_data=[],
-                thread_id=str(target_message.thread.id) if hasattr(target_message, 'thread') and target_message.thread else None
-            )
+            # Create Message object for AI analysis using the proper conversion method
+            message_obj = Message.from_discord_message(target_message, str(target_message.guild.id))
             
             # Get recent context messages for better analysis
             context_messages = []
             try:
                 async for msg in channel.history(limit=5, before=target_message, oldest_first=False):
                     if not msg.author.bot and msg.content.strip():
-                        context_msg = Message(
-                            message_id=str(msg.id),
-                            channel_id=str(msg.channel.id),
-                            server_id=str(msg.guild.id),
-                            author_id=str(msg.author.id),
-                            content=msg.content,
-                            timestamp=msg.created_at,
-                            attachment_urls=[],
-                            reaction_data=[],
-                            thread_id=None
-                        )
+                        context_msg = Message.from_discord_message(msg, str(msg.guild.id))
                         context_messages.append(context_msg)
             except:
                 # If we can't get context, continue without it

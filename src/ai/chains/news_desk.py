@@ -121,7 +121,7 @@ class NewsDeskChain:
                 "id": f"MSG_{i+1}",
                 "content": msg.content[:200] + "..." if len(msg.content) > 200 else msg.content,
                 "author": f"User_{msg.author_id[-4:]}",  # Anonymize with last 4 digits
-                "timestamp": msg.timestamp.strftime("%Y-%m-%d %H:%M"),
+                "timestamp": msg.timestamp_dt.strftime("%Y-%m-%d %H:%M"),
                 "reactions": msg.total_reactions,
                 "replies": msg.reply_count,
                 "controversy_score": round(msg.controversy_score, 2),
@@ -290,6 +290,6 @@ class NewsDeskChain:
         if len(messages) < 2:
             return 0.0
         
-        timestamps = [msg.timestamp for msg in messages]
+        timestamps = [msg.timestamp_dt for msg in messages]
         time_span = max(timestamps) - min(timestamps)
         return time_span.total_seconds() / 3600  # Convert to hours

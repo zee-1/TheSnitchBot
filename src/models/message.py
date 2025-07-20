@@ -121,6 +121,11 @@ class Message(CosmosDBEntity):
             raise ValueError("Score must be between -1 and 1")
         return v
     
+    @property
+    def timestamp_dt(self) -> datetime:
+        """Get timestamp as datetime object."""
+        return datetime.fromisoformat(self.timestamp.replace('Z', '+00:00'))
+    
     def calculate_engagement_score(self) -> float:
         """Calculate overall engagement score based on reactions and replies."""
         if self.total_reactions == 0 and self.reply_count == 0:

@@ -1,0 +1,150 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: snitch-bot-config
+data:
+  ENVIRONMENT: "production"
+  LOG_LEVEL: "INFO"
+  DEBUG: "false"
+  COSMOS_DATABASE_NAME: "snitch"
+  COSMOS_CONTAINER_OPERATIONAL: "operational_data"
+  COSMOS_CONTAINER_CONTENT: "content_data"
+  GROQ_MODEL_NAME: "mixtral-8x7b-32768"
+  CHROMA_HOST: "localhost"
+  CHROMA_PORT: "8000"
+  CHROMA_PERSIST_DIRECTORY: "/app/chroma_data"
+  DEFAULT_NEWSLETTER_TIME: "09:00"
+  DEFAULT_TIMEZONE: "UTC"
+  MAX_MESSAGES_PER_ANALYSIS: "1000"
+  RATE_LIMIT_COMMANDS_PER_MINUTE: "10"
+  RATE_LIMIT_NEWSLETTER_PER_DAY: "1"
+  ENABLE_MOCK_SERVICES: "false"
+  MOCK_AI_RESPONSES: "false"
+  SKIP_DISCORD_VERIFICATION: "false"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: snitch-discord-bot
+  labels:
+    app: snitch-discord-bot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: snitch-discord-bot
+  template:
+    metadata:
+      labels:
+        app: snitch-discord-bot
+    spec:
+      containers:
+      - name: snitch-bot
+        image: ${CONTAINER_REGISTRY}/snitch-discord-bot:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+        env:
+        # Discord Configuration (from secrets)
+        - name: DISCORD_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: snitch-bot-secrets
+              key: discord-token
+        - name: DISCORD_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: snitch-bot-secrets
+              key: discord-client-id
+        - name: DISCORD_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: snitch-bot-secrets
+              key: discord-client-secret
+        
+        # Azure Configuration (from secrets)
+        - name: AZURE_SUBSCRIPTION_ID
+          valueFrom:
+            secretKeyRef:
+              name: snitch-bot-secrets
+              key: azure-subscription-id
+        - name: AZURE_TENANT_ID
+          valueFrom:
+            secretKeyRef:
+              name: snitch-bot-secrets
+              key: azure-tenant-id
+        - name: AZURE_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: snitch-bot-secrets
+              key: azure-client-id
+        - name: AZURE_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: snitch-bot-secrets
+              key: azure-client-secret
+        
+        # Cosmos DB Configuration (from secrets)
+        - name: COSMOS_CONNECTION_STRING
+          valueFrom:
+            secretKeyRef:
+              name: snitch-bot-secrets
+              key: cosmos-connection-string
+        
+        # AI Configuration (from secrets)
+        - name: GROQ_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: snitch-bot-secrets
+              key: groq-api-key
+        
+        # Configuration from ConfigMap
+        envFrom:
+        - configMapRef:
+            name: snitch-bot-config
+        
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        
+        volumeMounts:
+        - name: chroma-data
+          mountPath: /app/chroma_data
+        
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+        
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+      
+      volumes:
+      - name: chroma-data
+        persistentVolumeClaim:
+          claimName: chroma-data-pvc
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: chroma-data-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi

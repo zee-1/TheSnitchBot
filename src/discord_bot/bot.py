@@ -413,7 +413,31 @@ class SnitchBot(commands.Bot):
         """Process a Discord message and store it."""
         try:
             # Convert Discord message to our Message model
-            msg_model = await self._convert_discord_message(message)
+            msg_model = Message.from_discord_message(message, str(message.guild.id))
+            
+            # Validate that we have a proper Message model
+            if not isinstance(msg_model, Message):
+                raise MessageProcessingError("Failed to create proper Message model from Discord message")
+            
+            # Populate reaction users properly (async operation)
+            for reaction_data in msg_model.reactions:
+                try:
+                    # Find the original reaction and get users
+                    discord_reaction = next(
+                        (r for r in message.reactions if str(r.emoji) == reaction_data.emoji), 
+                        None
+                    )
+                    if discord_reaction:
+                        users = []
+                        async for user in discord_reaction.users():
+                            users.append(str(user.id))
+                        reaction_data.users = users
+                        reaction_data.count = len(users)
+                except Exception as e:
+                    logger.warning(f"Failed to populate reaction users for {reaction_data.emoji}: {e}")
+            
+            # Update calculated metrics
+            msg_model.update_metrics()
             
             # Store in database
             message_repo = self.container.get_message_repository()
@@ -441,7 +465,10 @@ class SnitchBot(commands.Bot):
             message_repo = self.container.get_message_repository()
             
             # Get existing message
-            msg_model = await message_repo.get_by_message_id(str(reaction.message.id))
+            msg_model = await message_repo.get_by_message_id(
+                str(reaction.message.id), 
+                str(reaction.message.guild.id)
+            )
             if msg_model:
                 # Add reaction to model
                 reaction_model = ReactionData(
@@ -474,7 +501,10 @@ class SnitchBot(commands.Bot):
             # Similar to add but remove the reaction
             message_repo = self.container.get_message_repository()
             
-            msg_model = await message_repo.get_by_message_id(str(reaction.message.id))
+            msg_model = await message_repo.get_by_message_id(
+                str(reaction.message.id), 
+                str(reaction.message.guild.id)
+            )
             if msg_model:
                 # Update reaction count
                 for r in msg_model.reactions:
@@ -490,22 +520,6 @@ class SnitchBot(commands.Bot):
         except Exception as e:
             logger.error(f"Failed to process reaction remove: {e}")
     
-    async def _convert_discord_message(self, message: discord.Message) -> Message:
-        """Convert a Discord message to our Message model."""
-        
-        return Message(
-            message_id=str(message.id),
-            server_id=str(message.guild.id),
-            channel_id=str(message.channel.id),
-            author_id=str(message.author.id),
-            content=message.content,
-            timestamp=message.created_at.isoformat(),
-            reactions=[],  # Will be updated by reaction events
-            reply_count=0,  # Discord doesn't provide this directly
-            attachments=[att.url for att in message.attachments],
-            embeds=[embed.to_dict() for embed in message.embeds],
-            controversy_score=0.0  # Will be calculated by AI
-        )
     
     async def _should_generate_newsletter(self, config: ServerConfig, current_time: datetime) -> bool:
         """Check if it's time to generate a newsletter."""
@@ -516,12 +530,12 @@ class SnitchBot(commands.Bot):
             newsletter_repo = self.container.get_newsletter_repository()
             
             # Check if we already generated today
-            today_start = current_time.replace(hour=0, minute=0, second=0, microsecond=0)
-            today_newsletters = await newsletter_repo.get_by_server_and_date_range(
-                config.server_id, today_start, current_time
+            today_date = current_time.date()
+            existing_newsletter = await newsletter_repo.get_newsletter_by_date(
+                config.server_id, today_date
             )
             
-            return len(today_newsletters) == 0
+            return existing_newsletter is None
             
         except Exception as e:
             logger.error(f"Error checking newsletter schedule: {e}")

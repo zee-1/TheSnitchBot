@@ -11,7 +11,6 @@ from src.discord_bot.commands.base import AdminCommand, ModeratorCommand, Comman
 from src.core.exceptions import InvalidCommandArgumentError, DatabaseError
 from src.core.logging import get_logger
 from src.models.tip import Tip, TipStatus, TipPriority, TipCategory
-from src.data.repositories.tip_repository import TipRepository
 from src.utils.validation import validate_discord_id
 
 logger = get_logger(__name__)
@@ -103,7 +102,7 @@ class ApproveTipCommand(AdminCommand):
         
         try:
             # Get tip repository
-            tip_repo = TipRepository(ctx.container._cosmos_client, container_name='operational_data')
+            tip_repo = ctx.container.get_tip_repository()
             
             # Find tip by partial ID
             tip = await self._find_tip_by_partial_id(tip_repo, tip_id, ctx.guild_id)
@@ -216,7 +215,7 @@ class ApproveTipCommand(AdminCommand):
             await ctx.respond(embed=embed, ephemeral=True)
             logger.error(f"Unexpected error in approve-tip command: {e}", exc_info=True)
     
-    async def _find_tip_by_partial_id(self, tip_repo: TipRepository, partial_id: str, server_id: str) -> Optional[Tip]:
+    async def _find_tip_by_partial_id(self, tip_repo, partial_id: str, server_id: str) -> Optional[Tip]:
         """Find tip by partial ID match."""
         try:
             # First try exact match
@@ -329,7 +328,7 @@ class ListTipsCommand(ModeratorCommand):
         
         try:
             # Get tip repository
-            tip_repo = TipRepository(ctx.container._cosmos_client, container_name='operational_data')
+            tip_repo = ctx.container.get_tip_repository()
             
             # Get tips based on filters
             if category:
@@ -444,7 +443,7 @@ class TipStatsCommand(ModeratorCommand):
         
         try:
             # Get tip repository
-            tip_repo = TipRepository(ctx.container._cosmos_client, container_name='operational_data')
+            tip_repo = ctx.container.get_tip_repository()
             
             # Get statistics
             stats = await tip_repo.get_tip_statistics(ctx.guild_id)
