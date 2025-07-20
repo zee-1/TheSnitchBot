@@ -382,7 +382,7 @@ class ListTipsCommand(ModeratorCommand):
                 }
                 priority_emoji = priority_emojis.get(tip.priority, "⚪")
                 
-                field_name = f"{status_emoji} {priority_emoji} `{tip.id[:8]}...` - {tip.category.value.title()}"
+                field_name = f"{status_emoji} {priority_emoji} `{tip.id[:8]}...` - {tip.category.title()}"
                 field_value = f"**Age:** {tip.age_hours:.1f}h\n**Content:** {content_preview}"
                 
                 if tip.ai_relevance_score > 0:

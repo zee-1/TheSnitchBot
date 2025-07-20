@@ -1,0 +1,177 @@
+# Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
+# More GitHub Actions for Azure: https://github.com/Azure/actions
+# More info on Python, GitHub Actions, and Azure App Service: https://aka.ms/python-webapps-actions
+
+name: Build and deploy Python app to Azure App Service - thesnitchbot
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: '3.11'
+  APP_NAME: 'thesnitchbot'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python version
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Create and start virtual environment
+        run: |
+          python -m venv venv
+          source venv/bin/activate
+          echo "VIRTUAL_ENV=${VIRTUAL_ENV}" >> $GITHUB_ENV
+          echo "${VIRTUAL_ENV}/bin" >> $GITHUB_PATH
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run tests (optional)
+        run: |
+          # Add your test commands here if you have tests
+          # python -m pytest tests/
+          echo "No tests configured yet"
+
+      - name: Create deployment package
+        run: |
+          # Remove unnecessary files for deployment
+          rm -rf venv/
+          rm -rf .git/
+          rm -rf .github/
+          rm -rf tests/
+          rm -rf docs/
+          rm -rf azure/
+          rm -rf scripts/
+          rm -f docker-compose.yml
+          rm -f Dockerfile
+          rm -f .dockerignore
+          rm -f README-deployment.md
+          
+          # Create zip for deployment
+          zip -r release.zip . -x "*.git*" "venv/*" "__pycache__/*" "*.pyc"
+
+      - name: Upload artifact for deployment jobs
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-app
+          path: release.zip
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    environment:
+      name: 'Production'
+      url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
+    
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Download artifact from build job
+        uses: actions/download-artifact@v4
+        with:
+          name: python-app
+
+      - name: Unzip artifact for deployment
+        run: unzip release.zip
+
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        id: deploy-to-webapp
+        with:
+          app-name: ${{ env.APP_NAME }}
+          slot-name: 'Production'
+          package: .
+          startup-command: 'python main.py'
+
+  post-deploy:
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: always()
+    
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Configure App Service settings
+        run: |
+          # Set environment variables for the App Service
+          az webapp config appsettings set \
+            --name ${{ env.APP_NAME }} \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --settings \
+              DISCORD_TOKEN="${{ secrets.DISCORD_TOKEN }}" \
+              DISCORD_CLIENT_ID="${{ secrets.DISCORD_CLIENT_ID }}" \
+              DISCORD_CLIENT_SECRET="${{ secrets.DISCORD_CLIENT_SECRET }}" \
+              AZURE_SUBSCRIPTION_ID="${{ secrets.AZURE_SUBSCRIPTION_ID }}" \
+              AZURE_TENANT_ID="${{ secrets.AZURE_TENANT_ID }}" \
+              AZURE_CLIENT_ID="${{ secrets.AZURE_CLIENT_ID }}" \
+              AZURE_CLIENT_SECRET="${{ secrets.AZURE_CLIENT_SECRET }}" \
+              COSMOS_CONNECTION_STRING="${{ secrets.COSMOS_CONNECTION_STRING }}" \
+              COSMOS_DATABASE_NAME="snitch" \
+              COSMOS_CONTAINER_OPERATIONAL="operational_data" \
+              COSMOS_CONTAINER_CONTENT="content_data" \
+              GROQ_API_KEY="${{ secrets.GROQ_API_KEY }}" \
+              GROQ_MODEL_NAME="mixtral-8x7b-32768" \
+              ENVIRONMENT="production" \
+              LOG_LEVEL="INFO" \
+              DEBUG="false" \
+              ENABLE_MOCK_SERVICES="false" \
+              MOCK_AI_RESPONSES="false" \
+              CHROMA_HOST="localhost" \
+              CHROMA_PORT="8000" \
+              CHROMA_PERSIST_DIRECTORY="/tmp/chroma_data"
+
+      - name: Restart App Service
+        run: |
+          az webapp restart \
+            --name ${{ env.APP_NAME }} \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }}
+
+      - name: Check deployment status
+        run: |
+          # Wait for app to restart
+          sleep 30
+          
+          # Get app URL
+          APP_URL=$(az webapp show \
+            --name ${{ env.APP_NAME }} \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --query defaultHostName \
+            --output tsv)
+          
+          echo "App deployed to: https://$APP_URL"
+          
+          # Try to check if the app is responding (optional health check)
+          # curl -f "https://$APP_URL/health" || echo "Health check failed - this may be normal for Discord bots"

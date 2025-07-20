@@ -14,7 +14,10 @@ from src.models.message import Message
 
 logger = get_logger(__name__)
 
-
+MIN_MESSAGE = 10
+MAX_MESSAGE = 10000
+MIN_HRS = 1
+MAX_HRS = 48
 class BreakingNewsCommand(PublicCommand):
     """Command to generate breaking news from recent messages."""
     
@@ -30,19 +33,19 @@ class BreakingNewsCommand(PublicCommand):
         return {
             "message_count": {
                 "type": int,
-                "description": "Number of recent messages to analyze for breaking news (10-100)",
+                "description": f"Number of recent messages to analyze for breaking news ({MIN_MESSAGE}-{MAX_MESSAGE})",
                 "required": False,
                 "default": 50,
-                "min_value": 10,
-                "max_value": 100
+                "min_value": MIN_MESSAGE,
+                "max_value": MAX_MESSAGE
             },
             "time_window": {
                 "type": int,
-                "description": "Hours of message history to analyze (1-24)",
+                "description": f"Hours of message history to analyze ({MIN_HRS}-{MAX_HRS})",
                 "required": False,
                 "default": 2,
-                "min_value": 1,
-                "max_value": 24
+                "min_value": MIN_HRS,
+                "max_value": MAX_HRS
             }
         }
     
@@ -52,13 +55,13 @@ class BreakingNewsCommand(PublicCommand):
         
         # Message count (optional)
         message_count = kwargs.get('message_count', 50)
-        if not isinstance(message_count, int) or message_count < 10 or message_count > 100:
+        if not isinstance(message_count, int) or message_count < MIN_MESSAGE or message_count > MAX_HRS:
             message_count = 50
         validated['message_count'] = message_count
         
         # Time window in hours (optional)
         time_window = kwargs.get('time_window', 2)
-        if not isinstance(time_window, int) or time_window < 1 or time_window > 24:
+        if not isinstance(time_window, int) or time_window < MIN_HRS or time_window > MAX_HRS:
             time_window = 2
         validated['time_window'] = time_window
         
@@ -282,9 +285,9 @@ class BreakingNewsCommand(PublicCommand):
                 bulletin += f"'{top_words[0][0]}' "
             bulletin += f"with a whopping {total_messages} messages in the last few hours.\n\n"
             
-            if most_controversial and len(most_controversial.content) > 100:
+            if most_controversial and len(most_controversial.content) > MAX_MESSAGE:
                 bulletin += f"The tea is particularly hot with one user dropping this bombshell: "
-                bulletin += f'"{most_controversial.content[:100]}..."\n\n'
+                bulletin += f'"{most_controversial.content[:MAX_MESSAGE]}..."\n\n'
             
             bulletin += "Stay tuned for more chaos! 💅"
             
@@ -296,8 +299,8 @@ class BreakingNewsCommand(PublicCommand):
                 bulletin += f"'{top_words[0][0]}' "
             bulletin += "with multiple engagement indicators.\n\n"
             
-            if most_controversial and len(most_controversial.content) > 100:
-                bulletin += f"Key statement under scrutiny: \"{most_controversial.content[:100]}...\"\n\n"
+            if most_controversial and len(most_controversial.content) > MAX_MESSAGE:
+                bulletin += f"Key statement under scrutiny: \"{most_controversial.content[:MAX_MESSAGE]}...\"\n\n"
             
             bulletin += "Investigation ongoing. More details as they develop."
             
@@ -309,9 +312,9 @@ class BreakingNewsCommand(PublicCommand):
             if top_words:
                 bulletin += f"The hot topic? '{top_words[0][0].upper()}'! "
             
-            if most_controversial and len(most_controversial.content) > 100:
+            if most_controversial and len(most_controversial.content) > MAX_MESSAGE:
                 bulletin += f"OH MY! One player just dropped this MASSIVE play: "
-                bulletin += f'"{most_controversial.content[:100]}..."\n\n'
+                bulletin += f'"{most_controversial.content[:MAX_MESSAGE]}..."\n\n'
             
             bulletin += "THIS IS WHAT WE LIVE FOR, FOLKS!"
             
@@ -322,8 +325,8 @@ class BreakingNewsCommand(PublicCommand):
             if top_words:
                 bulletin += f"Primary discussion topic: '{top_words[0][0]}'. "
             
-            if most_controversial and len(most_controversial.content) > 100:
-                bulletin += f"\n\nHighlighted message: \"{most_controversial.content[:100]}...\""
+            if most_controversial and len(most_controversial.content) > MAX_MESSAGE:
+                bulletin += f"\n\nHighlighted message: \"{most_controversial.content[:MAX_MESSAGE]}...\""
             
             bulletin += "\n\nStay informed with The Snitch!"
         

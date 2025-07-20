@@ -132,3 +132,7 @@ Dockerfile.dev
 # Local development files
 local_settings.py
 dev_settings.py
+
+demo/
+
+*.ipynb
