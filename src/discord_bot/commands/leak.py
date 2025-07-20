@@ -83,8 +83,17 @@ class LeakCommand(PublicCommand):
                 target_name = f"User-{target_user_id[:8]}"
                 target_mention = f"<@{target_user_id}>"
             
-            # Generate fake leak
-            leak_content = self._generate_leak(target_name, ctx.server_config.persona.value)
+            # Generate AI-powered personalized leak
+            try:
+                settings = ctx.container.get_settings()
+                if settings.mock_ai_responses:
+                    leak_content = self._generate_mock_leak(target_name, ctx.server_config.persona, recent_messages)
+                else:
+                    # Use Groq AI for personalized leaks
+                    leak_content = await self._generate_ai_leak(target_name, target_user_id, ctx, recent_messages)
+            except Exception as ai_error:
+                logger.warning(f"AI leak generation failed, falling back to mock: {ai_error}")
+                leak_content = self._generate_mock_leak(target_name, ctx.server_config.persona, recent_messages)
             
             # Create leak embed
             embed = discord.Embed(
@@ -141,43 +150,147 @@ class LeakCommand(PublicCommand):
             await ctx.respond(embed=embed)
             logger.error(f"Error in leak command: {e}", exc_info=True)
     
-    def _generate_leak(self, target_name: str, persona: str) -> str:
-        """Generate a humorous fake leak about a user."""
+    async def _generate_ai_leak(self, target_name: str, target_user_id: str, ctx: CommandContext, recent_messages: list) -> str:
+        """Generate AI-powered personalized leak using Groq."""
+        try:
+            from src.ai import get_ai_service
+            ai_service = await get_ai_service()
+            
+            # Analyze target user's recent messages for context
+            target_messages = []
+            for msg in recent_messages[-50:]:  # Last 50 messages
+                if str(msg.author.id) == target_user_id:
+                    target_messages.append(msg.content)
+            
+            # Get context about other active users for potential mentions
+            other_users = {}
+            for msg in recent_messages[-30:]:  # Last 30 messages for context
+                if not msg.author.bot and str(msg.author.id) != target_user_id:
+                    user_name = msg.author.display_name if hasattr(msg.author, 'display_name') else msg.author.name
+                    if user_name not in other_users:
+                        other_users[user_name] = []
+                    other_users[user_name].append(msg.content[:100])  # Truncate for context
+            
+            # Build context for AI
+            context_info = {
+                "target_name": target_name,
+                "target_messages": target_messages[-5:],  # Last 5 messages from target
+                "other_users": dict(list(other_users.items())[:3]),  # Top 3 other active users
+                "server_name": ctx.interaction.guild.name if ctx.interaction.guild else "this server",
+                "persona": ctx.server_config.persona.value
+            }
+            
+            # Create AI prompt for leak generation
+            prompt = f"""Create a humorous, harmless "leak" about {target_name} for a Discord server gossip bot called "The Snitch". 
+
+IMPORTANT GUIDELINES:
+- Keep it completely innocent and fun
+- No sexual content, no cussing, no inappropriate material
+- Make it embarrassing but harmless (like silly habits, funny moments, etc.)
+- Can be slightly 18+ in terms of maturity (like mentioning dating, having crushes, etc.) but stay classy
+- Base it on recent chat patterns if possible
+- Include other server members if it makes the leak funnier
+- Make it sound like genuine gossip but obviously fake
+- Length: 1-2 sentences maximum
+
+PERSONA STYLE: {context_info['persona']} 
+- sassy_reporter: dramatic, gossipy, uses "tea" and drama language
+- investigative_journalist: formal, detailed, "sources confirm" style  
+- sports_commentator: energetic, play-by-play style with caps
+- conspiracy_theorist: dramatic, "WAKE UP SHEEPLE" style with conspiracies
+
+SERVER CONTEXT:
+- Target: {target_name}
+- Server: {context_info['server_name']}
+- Recent activity patterns: {', '.join(target_messages[-2:]) if target_messages else 'minimal activity'}
+- Other active members: {', '.join(list(other_users.keys())[:3]) if other_users else 'none'}
+
+Generate a single entertaining leak that could involve gossip about:
+- Funny gaming habits or fails
+- Silly Discord behaviors 
+- Harmless romantic situations (crushes, dating fails, etc.)
+- Embarrassing but innocent moments
+- Social interactions with other members
+- Pop culture obsessions or guilty pleasures
+
+Make it server-specific and personalized based on the context provided."""
+
+            # Get AI response
+            leak_content = await ai_service.groq_client.analyze_content(
+                content=prompt,
+                analysis_type="creative_writing",
+                context=f"Discord server leak generation for {context_info['server_name']}"
+            )
+            
+            # Clean up the response and ensure it's appropriate length
+            leak_content = leak_content.strip()
+            if len(leak_content) > 300:
+                # Truncate if too long
+                leak_content = leak_content[:297] + "..."
+                
+            return leak_content
+            
+        except Exception as e:
+            logger.error(f"AI leak generation failed: {e}")
+            # Fallback to mock
+            return self._generate_mock_leak(target_name, ctx.server_config.persona.value, recent_messages)
+    
+    def _generate_mock_leak(self, target_name: str, persona: str, recent_messages: list) -> str:
+        """Generate a humorous fake leak about a user with some personalization."""
         
-        # Different leak templates based on persona
+        # Try to get some context from recent messages
+        topics_mentioned = []
+        other_users = []
+        for msg in recent_messages[-20:]:
+            if not msg.author.bot:
+                # Extract potential topics/interests
+                content_lower = msg.content.lower()
+                for topic in ['gaming', 'anime', 'music', 'food', 'work', 'school', 'netflix', 'movies', 'coffee', 'pizza']:
+                    if topic in content_lower and topic not in topics_mentioned:
+                        topics_mentioned.append(topic)
+                
+                # Collect other user names for potential mentions
+                user_name = msg.author.display_name if hasattr(msg.author, 'display_name') else msg.author.name
+                if user_name != target_name and user_name not in other_users and len(other_users) < 3:
+                    other_users.append(user_name)
+        
+        # Enhanced leak templates with personalization hooks
+        topic = random.choice(topics_mentioned) if topics_mentioned else random.choice(['gaming', 'snacks', 'memes', 'music'])
+        other_user = random.choice(other_users) if other_users else "someone"
+        
         leak_templates = {
             'sassy_reporter': [
-                f"Sources confirm {target_name} has been secretly {random.choice(['binge-watching anime', 'collecting rubber ducks', 'practicing interpretive dance', 'learning to yodel', 'building a pillow fort empire'])} for the past {random.randint(2, 30)} days straight. 💅",
-                f"BREAKING: {target_name} allegedly {random.choice(['ate pineapple on pizza', 'uses light mode Discord', 'puts milk before cereal', 'double-dips chips', 'leaves one second on the microwave'])}. The audacity! 😱",
-                f"Tea has been spilled! 🍵 Insider reports {target_name} once {random.choice(['googled how to google', 'tried to pause an online game', 'asked Siri if she was single', 'waved at someone waving behind them', 'pushed a pull door for 5 minutes'])}.",
-                f"Exclusive leak: {target_name} secretly {random.choice(['writes fanfiction about kitchen appliances', 'names all their plants', 'talks to their reflection', 'has a lucky rubber chicken', 'sleeps with a nightlight shaped like a taco'])}. We have questions! 🤔"
+                f"Tea has been SPILLED! 🍵 {target_name} was caught {random.choice(['sliding into DMs about', 'obsessing over', 'secretly judging people who don\'t like', 'writing love letters to', 'dreaming about'])} {topic}. The dedication is real! 💅",
+                f"BREAKING: Multiple sources confirm {target_name} {random.choice(['has a secret crush on', 'starts arguments with', 'gets way too competitive with', 'sends memes to at 3AM', 'practices pickup lines on'])} {other_user}. We\'re here for this drama! 😱",
+                f"Exclusive scoop: {target_name} allegedly {random.choice(['cried watching', 'spent their rent money on', 'stays up all night thinking about', 'has strong opinions about', 'writes fanfiction involving'])} {topic}. No shame in that game, hun! 💁‍♀️",
+                f"Sources say {target_name} once {random.choice(['embarrassed themselves in front of', 'tried to impress', 'got roasted by', 'accidentally confessed their love to', 'challenged to a duel'])} {other_user} over {topic}. The secondhand embarrassment! 🤭"
             ],
             'investigative_journalist': [
-                f"After months of investigation, sources reveal {target_name} has been {random.choice(['operating an underground cookie empire', 'training carrier pigeons', 'developing a time machine in their garage', 'secretly learning ancient languages', 'mapping the migration patterns of dust bunnies'])}.",
-                f"Confidential documents suggest {target_name} once {random.choice(['spent 3 hours trying to catch a wifi signal', 'got lost in their own neighborhood', 'argued with a smart TV', 'tried to high-five their reflection', 'bought a lottery ticket with birthday candle numbers'])}.",
-                f"Investigation reveals: {target_name} allegedly {random.choice(['keeps a diary written entirely in emoji', 'has named their Wi-Fi router', 'practices acceptance speeches in the shower', 'uses a calculator to calculate calculator functions', 'owns 47 different rubber bands for mysterious purposes'])}.",
-                f"Breaking investigation: Multiple sources confirm {target_name} {random.choice(['once tried to friend request their own alt account', 'bought a plant just to have someone to talk to', 'has a secret handshake with their coffee maker', 'rates their meals on Yelp even when cooking at home', 'apologizes to furniture when they bump into it'])}."
+                f"INVESTIGATION COMPLETE: After extensive analysis, sources confirm {target_name} has been {random.choice(['conducting secret research on', 'building a shrine dedicated to', 'writing detailed analysis reports about', 'creating conspiracy theories involving', 'collecting evidence about'])} {topic}. The implications are staggering.",
+                f"Classified documents reveal {target_name} {random.choice(['maintains a secret alliance with', 'has been exchanging coded messages with', 'shares classified intel with', 'plots world domination with', 'practices synchronized activities with'])} {other_user}. Further investigation required.",
+                f"Breaking investigation: {target_name} allegedly {random.choice(['keeps detailed logs of', 'has photographic evidence of', 'maintains secret files on', 'conducts surveillance of', 'has insider knowledge about'])} {topic} activities. Sources remain anonymous for safety.",
+                f"CONFIDENTIAL REPORT: Multiple witnesses confirm {target_name} {random.choice(['holds secret meetings about', 'leads underground discussions on', 'organizes clandestine activities involving', 'masterminds elaborate schemes regarding', 'coordinates covert operations related to'])} {topic}."
             ],
             'sports_commentator': [
-                f"BREAKING NEWS FROM THE FIELD! {target_name} has been spotted {random.choice(['doing victory dances after opening jars', 'trash-talking NPCs in single-player games', 'celebrating goals scored in FIFA like they are real', 'high-fiving their pet after successful treats', 'doing play-by-play commentary while cooking'])}! What a legend! 🏆",
-                f"AND HERE COMES {target_name.upper()} WITH THE PLAY OF THE CENTURY! Sources say they {random.choice(['once scored a perfect game of solitaire', 'achieved a high score in typing tests', 'won an argument with autocorrect', 'successfully untangled earbuds on the first try', 'parallel parked in one attempt'])}! UNBELIEVABLE! 🎯",
-                f"LADIES AND GENTLEMEN, we have confirmation that {target_name} {random.choice(['practices their signature for when they become famous', 'does touchdown dances after successfully opening packages', 'celebrates personal victories with air guitar solos', 'has a victory playlist for completing mundane tasks', 'treats grocery shopping like a competitive sport'])}! THE CROWD GOES WILD! 📣",
-                f"EXCLUSIVE SPORTS LEAK! {target_name} has been {random.choice(['training for the Olympics of procrastination', 'perfecting their victory speech for winning arguments in the shower', 'practicing their game face in mirrors', 'developing strategies for competitive Netflix watching', 'coaching their houseplants to grow faster'])}! WHAT DEDICATION! 💪"
+                f"AND {target_name.upper()} COMES IN WITH THE CHAMPIONSHIP MOVE! They've been {random.choice(['dominating the leaderboards in', 'training intensively for', 'setting new records in', 'going undefeated in', 'becoming the undisputed champion of'])} {topic}! THE CROWD IS ON THEIR FEET! 🏆",
+                f"LADIES AND GENTLEMEN, {target_name.upper()} WITH THE PLAY OF THE SEASON! Sources confirm they {random.choice(['defeated', 'completely destroyed', 'schooled', 'obliterated in competition', 'left speechless'])} {other_user} in {topic}! WHAT A LEGENDARY PERFORMANCE! 🎯",
+                f"BREAKING SPORTS NEWS! {target_name} has been caught {random.choice(['practicing victory speeches for', 'doing celebration dances about', 'trash-talking opponents in', 'studying film footage of', 'developing new strategies for'])} {topic}! THE DEDICATION IS UNREAL! 📣",
+                f"EXCLUSIVE CHAMPIONSHIP LEAK! Multiple witnesses saw {target_name} {random.choice(['carrying good luck charms for', 'performing pre-game rituals involving', 'coaching others in the art of', 'holding secret training sessions for', 'establishing dominance in'])} {topic}! PURE ATHLETICISM! 💪"
             ],
             'conspiracy_theorist': [
-                f"WAKE UP SHEEPLE! {target_name} is clearly {random.choice(['an agent for Big Cereal', 'secretly communicating with pigeons', 'part of the underground sock puppet mafia', 'a time traveler from the age of dial-up internet', 'working for the Department of Lost Socks'])}! The signs are everywhere! 👁️",
-                f"THE TRUTH IS OUT THERE! Sources deep within the system reveal {target_name} {random.choice(['knows the real reason why hot dogs come in packs of 10 but buns in packs of 8', 'has been hoarding USB cables for the apocalypse', 'can communicate with printers and make them work', 'knows where all the missing Tupperware lids go', 'has the real explanation for why there is always that one sock missing'])}! 🛸",
-                f"GOVERNMENT COVER-UP EXPOSED! {target_name} allegedly {random.choice(['discovered the secret to making printers work on the first try', 'knows the location of the missing area between floors in elevators', 'has photographic evidence of functioning ice cream machines', 'possesses the ancient knowledge of how to fold fitted sheets', 'holds the key to understanding why traffic is always worse in the other lane'])}! 🔍",
-                f"THE ILLUMINATI DOESN'T WANT YOU TO KNOW: {target_name} has been {random.choice(['secretly organizing the migration patterns of shopping carts', 'controlling the algorithm that decides which sock goes missing', 'part of the conspiracy to make all USB plugs require 3 attempts', 'behind the plot to make every group project have one person who does nothing', 'orchestrating the great mystery of why phone chargers disappear'])}! COINCIDENCE? I THINK NOT! 🎭"
+                f"WAKE UP SHEEPLE! {target_name} is CLEARLY part of the {topic.upper()} ILLUMINATI! They've been {random.choice(['secretly controlling', 'manipulating the algorithms of', 'spreading propaganda about', 'conducting mind control experiments with', 'organizing the underground society of'])} {topic}! THE EVIDENCE IS EVERYWHERE! 👁️",
+                f"THE TRUTH ABOUT {target_name.upper()} IS OUT THERE! Deep state sources reveal they {random.choice(['have classified intel on', 'maintain secret communications about', 'control the hidden networks of', 'possess forbidden knowledge of', 'orchestrate global conspiracies involving'])} {topic}! COINCIDENCE? I THINK NOT! 🛸",
+                f"GOVERNMENT COVER-UP EXPOSED! {target_name} and {other_user} are OBVIOUSLY {random.choice(['co-conspirators in the', 'double agents working for', 'secret operatives of the', 'founding members of the', 'puppet masters behind the'])} {topic} conspiracy! THEY DON'T WANT YOU TO KNOW! 🔍",
+                f"BREAKING: THE {topic.upper()} CONSPIRACY IS REAL! {target_name} has been {random.choice(['planting subliminal messages about', 'recruiting new members through', 'funding secret operations involving', 'decoding ancient prophecies about', 'preparing for the uprising of'])} {topic}! CONNECT THE DOTS, PEOPLE! 🎭"
             ]
         }
         
         # Default template for unknown personas
         default_templates = [
-            f"Leaked: {target_name} apparently {random.choice(['collects funny-shaped rocks', 'names their houseplants', 'practices conversations in the mirror', 'has strong opinions about cereal', 'owns more phone chargers than phones'])}.",
-            f"Sources say {target_name} once {random.choice(['spent an hour looking for their phone while holding it', 'tried to push a door that said pull', 'googled Google', 'forgot their own password immediately after changing it', 'waved back at someone waving behind them'])}.",
-            f"Breaking: {target_name} secretly {random.choice(['talks to their plants', 'has a lucky pen', 'practices their autograph', 'counts steps while walking', 'saves memes but never shares them'])}.",
-            f"Exclusive: Multiple sources confirm {target_name} {random.choice(['apologizes to inanimate objects', 'has full conversations with their pets', 'makes sound effects while doing mundane tasks', 'celebrates small victories with personal victory dances', 'uses calculators for simple math'])}."
+            f"LEAKED: {target_name} has been secretly {random.choice(['obsessing over', 'writing poetry about', 'creating elaborate theories involving', 'collecting rare items related to', 'practicing rituals centered around'])} {topic}. The evidence is mounting!",
+            f"Sources confirm {target_name} and {other_user} have been {random.choice(['plotting something involving', 'sharing secret knowledge about', 'competing fiercely over', 'bonding over their mutual love of', 'forming an alliance based on'])} {topic}. Suspicious!",
+            f"Breaking: {target_name} allegedly {random.choice(['has a secret stash of', 'dreams about', 'judges people based on their', 'keeps detailed records of', 'practices daily meditation with'])} {topic}. The truth is out there!",
+            f"Exclusive: Multiple witnesses report {target_name} {random.choice(['gets emotional about', 'starts heated debates over', 'has strong spiritual connections to', 'plans their entire day around', 'finds deep meaning in'])} {topic}. No comment from the subject."
         ]
         
         # Get templates for the current persona or use default
