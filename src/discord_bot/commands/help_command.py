@@ -61,6 +61,10 @@ class HelpCommand(PublicCommand):
                 "`/tip-stats [days]` - View tip submission statistics and analytics"
             ]
             
+            admin_utility_commands = [
+                "`/sync-commands` - Manually sync Discord slash commands (maintenance tool)"
+            ]
+            
             embed.add_field(
                 name="👑 Admin - Configuration",
                 value="\n".join(admin_config_commands),
@@ -70,6 +74,12 @@ class HelpCommand(PublicCommand):
             embed.add_field(
                 name="👑 Admin - Tip Management", 
                 value="\n".join(admin_tip_commands),
+                inline=False
+            )
+            
+            embed.add_field(
+                name="👑 Admin - Utilities", 
+                value="\n".join(admin_utility_commands),
                 inline=False
             )
             
