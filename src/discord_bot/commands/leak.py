@@ -51,37 +51,35 @@ class LeakCommand(PublicCommand):
             async for message in channel.history(limit=200):
                 recent_messages.append(message)
             
-            # Collect unique active users (excluding bots and the command user)
-            active_users = set()
-            for msg in recent_messages:
-                # Skip bots and the user who ran the command
-                if (not msg.author.bot and 
-                    str(msg.author.id) != ctx.user_id):
-                    active_users.add(str(msg.author.id))
+            # Use enhanced user selector for better random selection
+            from src.ai.chains.leak_chains.user_selector import EnhancedUserSelector
             
-            if not active_users:
+            user_selector = EnhancedUserSelector(
+                min_recent_messages=ctx.server_config.leak_min_user_activity,
+                exclude_recent_targets=ctx.server_config.leak_exclude_recent_targets_hours > 0,
+                min_message_length=10,
+                max_users_to_consider=ctx.server_config.leak_max_context_messages
+            )
+            selected_user_info = await user_selector.select_random_user(
+                recent_messages=recent_messages,
+                command_user_id=ctx.user_id,
+                server_id=ctx.guild_id
+            )
+            
+            if not selected_user_info:
                 embed = EmbedBuilder.warning(
                     "No Targets Available",
-                    "No recent activity detected. Try again when there are more active users! 🕵️"
+                    "No suitable candidates found from recent activity. Try again when there are more active users! 🕵️"
                 )
                 await ctx.respond(embed=embed)
                 return
             
-            # Select random user
-            target_user_id = random.choice(list(active_users))
+            # Extract user info from enhanced selector
+            target_user_id = selected_user_info["user_id"]
+            target_name = selected_user_info["display_name"]
+            target_mention = f"<@{target_user_id}>"
             
-            # Get user info
-            try:
-                target_user = ctx.guild.get_member(int(target_user_id))
-                if not target_user:
-                    # Try to fetch from Discord
-                    target_user = await ctx.interaction.client.fetch_user(int(target_user_id))
-                
-                target_name = target_user.display_name if hasattr(target_user, 'display_name') else target_user.name
-                target_mention = f"<@{target_user_id}>"
-            except:
-                target_name = f"User-{target_user_id[:8]}"
-                target_mention = f"<@{target_user_id}>"
+            logger.info(f"Enhanced user selector chose: {target_name} (ID: {target_user_id}) from {selected_user_info.get('message_count', 0)} recent messages")
             
             # Generate AI-powered personalized leak
             try:
@@ -159,7 +157,65 @@ class LeakCommand(PublicCommand):
             logger.error(f"Error in leak command: {e}", exc_info=True)
     
     async def _generate_ai_leak(self, target_name: str, target_user_id: str, ctx: CommandContext, recent_messages: list) -> str:
-        """Generate AI-powered personalized leak using Groq."""
+        """Generate AI-powered personalized leak using Chain of Thoughts approach."""
+        try:
+            # Check if CoT is enabled for this server
+            if ctx.server_config.leak_cot_enabled:
+                return await self._generate_ai_leak_with_cot(target_name, target_user_id, ctx, recent_messages)
+            else:
+                logger.info("CoT disabled for this server, using legacy approach")
+                return await self._generate_ai_leak_legacy(target_name, target_user_id, ctx, recent_messages)
+        except Exception as e:
+            logger.warning(f"CoT leak generation failed, falling back to legacy approach: {e}")
+            return await self._generate_ai_leak_legacy(target_name, target_user_id, ctx, recent_messages)
+
+    async def _generate_ai_leak_with_cot(self, target_name: str, target_user_id: str, ctx: CommandContext, recent_messages: list) -> str:
+        """Generate AI-powered leak using Chain of Thoughts approach."""
+        try:
+            from src.ai import get_ai_service
+            from src.ai.chains.leak_chains import ContextAnalyzer, ContentPlanner, LeakWriter
+            
+            ai_service = await get_ai_service()
+            
+            # Step 1: Context Analysis
+            logger.info("CoT Step 1: Analyzing context")
+            context_analyzer = ContextAnalyzer(ai_service.groq_client)
+            context_analysis = await context_analyzer.analyze_context(
+                target_user_id=target_user_id,
+                target_name=target_name,
+                recent_messages=recent_messages,
+                server_config=ctx.server_config
+            )
+            
+            # Step 2: Content Planning
+            logger.info("CoT Step 2: Planning content")
+            content_planner = ContentPlanner(ai_service.groq_client)
+            content_plan = await content_planner.plan_content(
+                context_analysis=context_analysis,
+                persona=ctx.server_config.persona,
+                content_guidelines=self._get_content_guidelines()
+            )
+            
+            # Step 3: Final Content Writing
+            logger.info("CoT Step 3: Writing final content")
+            leak_writer = LeakWriter(ai_service.groq_client)
+            final_content = await leak_writer.write_leak(
+                content_plan=content_plan,
+                persona=ctx.server_config.persona,
+                format_requirements=self._get_format_requirements(),
+                target_name=target_name
+            )
+            
+            logger.info(f"CoT leak generation completed. Reasoning chain: {len(context_analysis.reasoning)} + {len(content_plan.reasoning)} + {len(final_content.reasoning)} chars")
+            
+            return final_content.content
+            
+        except Exception as e:
+            logger.error(f"CoT leak generation failed: {e}")
+            raise  # Re-raise to trigger fallback
+
+    async def _generate_ai_leak_legacy(self, target_name: str, target_user_id: str, ctx: CommandContext, recent_messages: list) -> str:
+        """Legacy AI leak generation (fallback method)."""
         try:
             from src.ai import get_ai_service
             ai_service = await get_ai_service()
@@ -188,45 +244,25 @@ class LeakCommand(PublicCommand):
                "persona": ctx.server_config.persona
             }
             
-            # Create AI prompt for leak generation
-            prompt = f"""Create a humorous, harmless "leak" about {target_name} for a Discord server gossip bot called "The Snitch". 
-"Alright, Snitch Squad! 🕵️‍♀️ It's time to spill some piping hot, totally innocent tea for "The Snitch" gossip bot on our Discord server! Your mission, should you choose to accept it, is to cook up a hilarious, slightly embarrassing, but *completely harmless* "leak" about {target_name}.
+            # Create simplified AI prompt for leak generation
+            prompt = f"""Create a humorous, harmless "leak" about {target_name} for a Discord server gossip bot.
 
-**Here's the 411:**
--   **Length:** Keep it short and sweet, max 20-30 words. We're talking quick, punchy gossip that hits different.
--   **Vibe Check:** This *has* to be innocent, fun, and embarrassing in the most wholesome way. Absolutely NO cussing, sexual content, or anything inappropriate. Think "OMG, I can't believe they did that!" not "OMG, they're cancelled!"
--   **Maturity:** It's cool to hint at light 18+ themes like crushes, dating fails, or awkward romantic situations, but keep it super classy and tasteful. A bit spicy deets! But not crossing limits
--   **Authenticity:** Make it sound like genuine, juicy (but obviously fake) server gossip.
--   **Slang Game Strong:** Inject some current internet slang and youth-speak naturally. Think "rizz," "simp," "bet," "no cap," "it's giving," "main character energy," "IYKYK," "glow up," "ratio'd," etc. (use sparingly and organically).
+USER CONTEXT: {target_name} recently active in {context_info['server_name']}
+PERSONA: {ctx.server_config.persona.value}
+RECENT TOPICS: {', '.join(target_messages[-3:]) if target_messages else 'general chat'}
 
-**TOPIC DRAFT - LET'S DIVERSIFY THE TEA!**
-We need a *wide variety* of topics, so **DO NOT** give excessive weight to just one area (like gaming or Discord habits). Mix it up! Here are some ideas to get your gossip gears turning:
--   Funny social media blunders or attempts at viral trends (e.g., a failed TikTok dance, an embarrassing Insta story, getting ratio'd on Twitter).
--   Awkward real-life encounters or public mishaps (e.g., tripping in public, mispronouncing a word in a cringe way, getting caught singing off-key).
--   Relatable dating/crush drama (e.g., getting ghosted by their crush, a hilarious first date fail, a secret crush reveal gone wrong—keep it light and funny!).
--   Obsessions with pop culture (e.g., binging a super cheesy show, stanning a niche artist, having a weird fan theory, being obsessed with a meme).
--   Quirky personal habits or fashion choices (e.g., always wearing mismatched socks, having a secret love for Crocs, a questionable fashion "glow up" attempt).
--   Silly Discord behaviors (e.g., accidentally muting themselves mid-rant, spamming ancient emojis, falling asleep on voice chat).
--   Hilarious social interactions with other server members (e.g., {target_name} trying to impress other_active_members[0] and failing spectacularly, a funny misunderstanding with other_active_members[1]).
+Generate a single, entertaining leak (max 150 characters) that is:
+- Completely harmless and appropriate
+- Obviously satirical 
+- Funny and embarrassing in a wholesome way
+- Relevant to the user or server context
 
-**SERVER CONTEXT (for personalization):**
--   **Target:** {target_name}
--   **Server Name:** {context_info['server_name']}
--   **Recent Activity Patterns (if available):** {', '.join(target_messages[-50:]) if target_messages else 'minimal activity'}
--   **Other Active Members (if available):** {', '.join(list(other_users.keys())) if other_users else 'none'}
-
-Your final output should be a single, entertaining, and harmless gossip leak. Make it server-specific and personalized based on the context provided.
-
-"""
-            # Get AI response
-        #     content: str,
-        # analysis_type: str,
-        # context: Optional[str] = None,
-        # model: Optional[str] = None
+Just return the leak content, nothing else."""
+            
             leak_content = await ai_service.groq_client.simple_completion(
                 prompt=prompt,
                 temperature=0.9,
-                max_tokens=500
+                max_tokens=200
             )
             
             # Clean up the response and ensure it's appropriate length
@@ -238,8 +274,8 @@ Your final output should be a single, entertaining, and harmless gossip leak. Ma
             return leak_content
             
         except Exception as e:
-            logger.error(f"AI leak generation failed: {e}")
-            # Fallback to mock
+            logger.error(f"Legacy AI leak generation failed: {e}")
+            # Final fallback to mock
             return self._generate_mock_leak(target_name, ctx.server_config.persona, recent_messages)
     
     def _generate_mock_leak(self, target_name: str, persona: str, recent_messages: list) -> str:
@@ -304,6 +340,28 @@ Your final output should be a single, entertaining, and harmless gossip leak. Ma
         templates = leak_templates.get(persona, default_templates)
         
         return random.choice(templates)
+
+    def _get_content_guidelines(self) -> Dict[str, Any]:
+        """Get content safety and style guidelines for CoT chains."""
+        return {
+            "max_length": 200,
+            "min_length": 20,
+            "safety_level": "family_friendly",
+            "humor_style": "wholesome_embarrassing",
+            "banned_topics": ["nsfw", "harassment", "real_drama", "personal_attacks"],
+            "encouraged_topics": ["gaming", "social_mishaps", "hobby_obsessions", "personality_quirks"],
+            "tone_requirements": ["obviously_fake", "harmless", "community_friendly"]
+        }
+
+    def _get_format_requirements(self) -> Dict[str, Any]:
+        """Get format requirements for final content."""
+        return {
+            "max_characters": 200,
+            "include_emojis": True,
+            "style": "gossip_leak",
+            "target_audience": "discord_community",
+            "obviousness_level": "clearly_satirical"
+        }
 
 
 # Register the command

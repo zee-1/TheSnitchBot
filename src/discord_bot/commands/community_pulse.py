@@ -166,7 +166,7 @@ class CommunityPulseCommand(PublicCommand):
         metrics = await self._calculate_pulse_metrics(messages)
         
         # Get server stats for context
-        server_stats = await server_repo.get_server_stats(ctx.server_config.server_id)
+        server_stats = await server_repo.get_server_stats()
         
         return {
             "messages": messages,
@@ -236,8 +236,19 @@ class CommunityPulseCommand(PublicCommand):
         # Activity patterns
         hourly_activity = {}
         for msg in messages:
-            hour = msg.timestamp.hour
-            hourly_activity[hour] = hourly_activity.get(hour, 0) + 1
+            try:
+                # Handle timestamp as string or datetime
+                if isinstance(msg.timestamp, str):
+                    # Parse ISO format timestamp string
+                    from datetime import datetime
+                    timestamp = datetime.fromisoformat(msg.timestamp.replace('Z', '+00:00'))
+                    hour = timestamp.hour
+                else:
+                    hour = msg.timestamp.hour
+                hourly_activity[hour] = hourly_activity.get(hour, 0) + 1
+            except Exception as e:
+                logger.warning(f"Failed to parse timestamp {msg.timestamp}: {e}")
+                continue
         
         peak_hours = sorted(hourly_activity.items(), key=lambda x: x[1], reverse=True)[:3]
         

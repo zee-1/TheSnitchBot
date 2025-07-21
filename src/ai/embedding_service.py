@@ -294,6 +294,14 @@ class EmbeddingService:
                 
                 # Check time window
                 msg_timestamp = msg["metadata"].get("timestamp", 0)
+                # Convert string timestamp to float if needed
+                if isinstance(msg_timestamp, str):
+                    try:
+                        from datetime import datetime
+                        dt = datetime.fromisoformat(msg_timestamp.replace('Z', '+00:00'))
+                        msg_timestamp = dt.timestamp()
+                    except:
+                        msg_timestamp = 0
                 if msg_timestamp >= time_threshold:
                     related_messages.append(msg)
                 
@@ -345,7 +353,16 @@ class EmbeddingService:
             # Filter messages by time threshold
             filtered_messages = []
             for doc, metadata in zip(recent_messages["documents"][0], recent_messages["metadatas"][0]):
-                if metadata.get("timestamp", 0) >= time_threshold:
+                timestamp = metadata.get("timestamp", 0)
+                # Convert string timestamp to float if needed
+                if isinstance(timestamp, str):
+                    try:
+                        from datetime import datetime
+                        dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                        timestamp = dt.timestamp()
+                    except:
+                        timestamp = 0
+                if timestamp >= time_threshold:
                     filtered_messages.append((doc, metadata))
             
             if not filtered_messages:

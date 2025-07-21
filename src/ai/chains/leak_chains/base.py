@@ -3,11 +3,10 @@ Base classes for leak command Chain of Thoughts implementation.
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
 from src.ai.groq_client import GroqClient
 from src.core.logging import get_logger
-
 logger = get_logger(__name__)
 
 

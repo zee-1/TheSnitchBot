@@ -65,6 +65,13 @@ class ServerConfig(CosmosDBEntity):
     leak_command_enabled: bool = Field(True, description="Enable leak command")
     tip_submission_enabled: bool = Field(True, description="Enable tip submission")
     
+    # Chain of Thoughts settings for leak command
+    leak_cot_enabled: bool = Field(True, description="Enable Chain of Thoughts for leak command")
+    leak_cot_timeout_seconds: int = Field(30, description="CoT processing timeout in seconds")
+    leak_max_context_messages: int = Field(50, description="Max messages for CoT context analysis")
+    leak_min_user_activity: int = Field(2, description="Minimum user activity threshold for targeting")
+    leak_exclude_recent_targets_hours: int = Field(2, description="Hours to exclude recently targeted users")
+    
     # Rate limiting
     commands_per_minute: int = Field(10, description="Commands per minute per user")
     newsletter_cooldown_hours: int = Field(24, description="Hours between newsletters")

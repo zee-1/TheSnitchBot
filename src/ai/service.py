@@ -484,10 +484,11 @@ Analysis Focus: {focus}
         """Create AI prompt for pulse analysis."""
         persona_style = {
             PersonaType.SASSY_REPORTER: "sassy and entertaining",
-            PersonaType.PROFESSIONAL_JOURNALIST: "professional and analytical",
+            PersonaType.INVESTIGATIVE_JOURNALIST: "professional and analytical",
             PersonaType.GOSSIP_COLUMNIST: "gossipy and dramatic",
-            PersonaType.INVESTIGATIVE_REPORTER: "thorough and investigative",
-            PersonaType.SOCIAL_MEDIA_INFLUENCER: "trendy and engaging"
+            PersonaType.SPORTS_COMMENTATOR: "energetic and competitive",
+            PersonaType.WEATHER_ANCHOR: "descriptive and forecasting",
+            PersonaType.CONSPIRACY_THEORIST: "suspicious and theorizing"
         }.get(persona, "balanced and informative")
         
         style_instructions = {

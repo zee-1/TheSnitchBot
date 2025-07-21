@@ -7,7 +7,7 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime
 from enum import Enum
 
-from src.models.base import BaseModel
+from src.models.base import BaseModel, CosmosDBEntity
 
 
 class PrivacyLevel(Enum):
@@ -29,7 +29,7 @@ class FeatureOptOut(Enum):
     GOSSIP_ANALYSIS = "gossip_analysis"
 
 
-class UserPreferences(BaseModel):
+class UserPreferences(CosmosDBEntity):
     """User preferences for privacy and participation."""
     
     def __init__(
@@ -42,6 +42,10 @@ class UserPreferences(BaseModel):
         exclude_from_social_mapping: bool = False,
         **kwargs
     ):
+        # Set required CosmosDBEntity fields
+        kwargs['partition_key'] = server_id
+        kwargs['entity_type'] = 'user_preferences'
+        
         super().__init__(**kwargs)
         self.user_id = user_id
         self.server_id = server_id
@@ -50,12 +54,7 @@ class UserPreferences(BaseModel):
         self.anonymous_in_analysis = anonymous_in_analysis
         self.exclude_from_social_mapping = exclude_from_social_mapping
         self.last_updated = datetime.now()
-        self.created_at = getattr(self, 'created_at', datetime.now())
     
-    @property
-    def partition_key(self) -> str:
-        """Partition key for Cosmos DB."""
-        return self.server_id
     
     def is_opted_out_of(self, feature: FeatureOptOut) -> bool:
         """Check if user is opted out of a specific feature."""
@@ -219,9 +218,18 @@ class PrivacyManager:
         filtered_messages = []
         
         for message in messages:
-            user_id = getattr(message, 'author_id', None)
-            if user_id and await self.can_user_participate(user_id, server_id, feature):
-                filtered_messages.append(message)
+            try:
+                # Try different ways to get user_id from message
+                user_id = getattr(message, 'author_id', None)
+                if not user_id:
+                    user_id = getattr(message, 'user_id', None)
+                
+                if user_id and await self.can_user_participate(str(user_id), server_id, feature):
+                    filtered_messages.append(message)
+            except Exception as e:
+                # Log and skip problematic messages rather than failing entirely
+                logger.warning(f"Error filtering message for privacy: {e}")
+                continue
         
         return filtered_messages
     
