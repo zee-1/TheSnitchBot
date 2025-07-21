@@ -339,6 +339,5 @@ class BreakingNewsCommand(PublicCommand):
         return bulletin
 
 
-# Register the command
-from src.discord_bot.commands.base import command_registry
-command_registry.register(BreakingNewsCommand())
+# Command is now handled by /content breaking-news app command
+# No need to register in old command registry

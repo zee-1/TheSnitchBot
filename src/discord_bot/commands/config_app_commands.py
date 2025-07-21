@@ -279,6 +279,171 @@ class ConfigCommands(app_commands.Group):
             await interaction.followup.send(embed=embed)
             logger.error(f"Error in set-newsletter-time command: {e}", exc_info=True)
     
+    @app_commands.command(name="set-bot-updates-channel", description="Set the channel for bot status updates and notifications")
+    @app_commands.describe(channel="The channel where bot updates will be posted (optional, uses current channel if not specified)")
+    async def set_bot_updates_channel(
+        self, 
+        interaction: discord.Interaction, 
+        channel: Optional[discord.TextChannel] = None
+    ):
+        """Set the bot updates channel."""
+        # Defer immediately to prevent timeout
+        await interaction.response.defer(ephemeral=False)
+        
+        server_config, can_proceed = await self._get_server_config(interaction)
+        if not can_proceed:
+            return
+            
+        # Use current channel if none specified
+        target_channel = channel or interaction.channel
+        
+        try:
+            # Check bot permissions in target channel
+            bot_member = interaction.guild.me
+            channel_perms = target_channel.permissions_for(bot_member)
+            
+            missing_perms = []
+            if not channel_perms.send_messages:
+                missing_perms.append("Send Messages")
+            if not channel_perms.embed_links:
+                missing_perms.append("Embed Links")
+            
+            if missing_perms:
+                embed = EmbedBuilder.warning(
+                    "Missing Permissions",
+                    f"I don't have the following permissions in {target_channel.mention}:\n"
+                    f"```{', '.join(missing_perms)}```\n"
+                    f"Please grant these permissions and try again."
+                )
+                await interaction.followup.send(embed=embed)
+                return
+            
+            # Update bot updates channel
+            server_repo = self.container.get_server_repository()
+            success = await server_repo.update_bot_updates_channel(
+                str(interaction.guild_id), str(target_channel.id)
+            )
+            
+            if success:
+                embed = EmbedBuilder.success(
+                    "Bot Updates Channel Updated",
+                    f"Bot status updates and notifications will now be sent to {target_channel.mention}! 🤖\n\n"
+                    f"You'll receive notifications about:\n"
+                    f"• Bot startup/shutdown\n"
+                    f"• Feature updates\n"
+                    f"• System status changes\n"
+                    f"• Error notifications"
+                )
+                
+                embed.add_field(
+                    name="📋 Required Permissions",
+                    value="✅ Send Messages\n✅ Embed Links",
+                    inline=True
+                )
+                
+                embed.add_field(
+                    name="🔔 What You'll See",
+                    value="Startup notifications, feature updates, and status messages",
+                    inline=False
+                )
+            else:
+                embed = EmbedBuilder.error(
+                    "Update Failed",
+                    "Failed to update bot updates channel. Please try again."
+                )
+            
+            await interaction.followup.send(embed=embed)
+            
+        except Exception as e:
+            embed = EmbedBuilder.error(
+                "Command Failed",
+                "An error occurred while updating the bot updates channel."
+            )
+            await interaction.followup.send(embed=embed)
+            logger.error(f"Error in set-bot-updates-channel command: {e}", exc_info=True)
+    
+    @app_commands.command(name="set-output-channel", description="Set the channel for command outputs (breaking news, leaks, etc.)")
+    @app_commands.describe(channel="The channel where command outputs will be posted (optional, uses current channel if not specified)")
+    async def set_output_channel(
+        self, 
+        interaction: discord.Interaction, 
+        channel: Optional[discord.TextChannel] = None
+    ):
+        """Set the output channel for command responses."""
+        # Defer immediately to prevent timeout
+        await interaction.response.defer(ephemeral=False)
+        
+        server_config, can_proceed = await self._get_server_config(interaction)
+        if not can_proceed:
+            return
+            
+        # Use current channel if none specified
+        target_channel = channel or interaction.channel
+        
+        try:
+            # Check bot permissions in target channel
+            bot_member = interaction.guild.me
+            channel_perms = target_channel.permissions_for(bot_member)
+            
+            missing_perms = []
+            if not channel_perms.send_messages:
+                missing_perms.append("Send Messages")
+            if not channel_perms.embed_links:
+                missing_perms.append("Embed Links")
+            
+            if missing_perms:
+                embed = EmbedBuilder.warning(
+                    "Missing Permissions",
+                    f"I don't have the following permissions in {target_channel.mention}:\n"
+                    f"```{', '.join(missing_perms)}```\n"
+                    f"Please grant these permissions and try again."
+                )
+                await interaction.followup.send(embed=embed)
+                return
+            
+            # Update output channel
+            server_repo = self.container.get_server_repository()
+            success = await server_repo.update_output_channel(
+                str(interaction.guild_id), str(target_channel.id)
+            )
+            
+            if success:
+                embed = EmbedBuilder.success(
+                    "Output Channel Updated",
+                    f"Command outputs will now be sent to {target_channel.mention}! 📤\n\n"
+                    f"The following commands will use this channel:\n"
+                    f"• `/content breaking-news`\n"
+                    f"• `/leak`\n"
+                    f"• Other content generation commands"
+                )
+                
+                embed.add_field(
+                    name="📋 Required Permissions",
+                    value="✅ Send Messages\n✅ Embed Links",
+                    inline=True
+                )
+                
+                embed.add_field(
+                    name="📍 Channel Usage",
+                    value="Content will be posted here instead of where commands are used",
+                    inline=False
+                )
+            else:
+                embed = EmbedBuilder.error(
+                    "Update Failed",
+                    "Failed to update output channel. Please try again."
+                )
+            
+            await interaction.followup.send(embed=embed)
+            
+        except Exception as e:
+            embed = EmbedBuilder.error(
+                "Command Failed",
+                "An error occurred while updating the output channel."
+            )
+            await interaction.followup.send(embed=embed)
+            logger.error(f"Error in set-output-channel command: {e}", exc_info=True)
+
     @app_commands.command(name="status", description="View current bot configuration and status")
     async def status(self, interaction: discord.Interaction):
         """View server configuration status."""
@@ -330,6 +495,34 @@ class ConfigCommands(app_commands.Group):
                 embed.add_field(
                     name="📍 Newsletter Channel",
                     value="⚠️ Not configured",
+                    inline=True
+                )
+            
+            # Output channel
+            if server_config.output_channel_id:
+                embed.add_field(
+                    name="📤 Output Channel",
+                    value=f"<#{server_config.output_channel_id}>",
+                    inline=True
+                )
+            else:
+                embed.add_field(
+                    name="📤 Output Channel",
+                    value="⚠️ Not configured (commands will respond in place)",
+                    inline=True
+                )
+            
+            # Bot updates channel
+            if server_config.bot_updates_channel_id:
+                embed.add_field(
+                    name="🤖 Bot Updates Channel",
+                    value=f"<#{server_config.bot_updates_channel_id}>",
+                    inline=True
+                )
+            else:
+                embed.add_field(
+                    name="🤖 Bot Updates Channel",
+                    value="⚠️ Not configured (will use newsletter channel as fallback)",
                     inline=True
                 )
             

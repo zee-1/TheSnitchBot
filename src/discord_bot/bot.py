@@ -179,21 +179,16 @@ class SnitchBot(commands.Bot):
         
         # Register simple commands without parameters
         all_commands = command_registry.get_all_commands()
+        print("All commands list===>")
+        print(all_commands)
         logger.info(f"Found {len(all_commands)} simple commands to register")
         
         registered_commands = ["config"]  # Config group already added
         
         for command_instance in all_commands:
             try:
-                # Skip commands that are handled by app command groups
-                # if (command_instance.name.startswith("set-") or 
-                #     command_instance.name == "bot-status" or
-                #     command_instance.name == "breaking-news" or
-                #     command_instance.name == "fact-check" or
-                #     command_instance.name == "submit-tip" or
-                #     command_instance.name == "controversy-check"):
-                #     logger.info(f"Skipping {command_instance.name} (handled by app command group)")
-                #     continue
+                # All commands are now properly organized - no need to skip any
+                # Old duplicate commands have been removed from command registry
                     
                 logger.info(f"Registering command: {command_instance.name}")
                 

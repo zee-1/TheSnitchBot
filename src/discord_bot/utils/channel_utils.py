@@ -60,7 +60,8 @@ async def send_to_output_channel(
 async def send_bot_update(
     server_config: ServerConfig,
     embed: discord.Embed,
-    discord_client=None
+    discord_client=None,
+    use_fallback: bool = False
 ) -> bool:
     """
     Send a bot update to the configured bot updates channel.
@@ -69,14 +70,24 @@ async def send_bot_update(
         server_config: Server configuration
         embed: Discord embed to send
         discord_client: Discord client instance (optional)
+        use_fallback: Whether to use fallback channels if bot updates channel not configured
         
     Returns:
         bool: True if sent successfully, False otherwise
     """
     bot_updates_channel_id = server_config.get_bot_updates_channel()
     
-    if not bot_updates_channel_id:
-        return False  # No bot updates channel configured
+    # Try fallback channels if bot updates channel not configured and fallback enabled
+    if not bot_updates_channel_id and use_fallback:
+        # Try newsletter channel as fallback
+        if server_config.newsletter_channel_id:
+            bot_updates_channel_id = server_config.newsletter_channel_id
+            logger.info(f"Using newsletter channel {bot_updates_channel_id} as fallback for bot updates")
+        else:
+            logger.info(f"No bot updates channel or newsletter channel configured for server {server_config.server_id}")
+            return False
+    elif not bot_updates_channel_id:
+        return False  # No bot updates channel configured and no fallback requested
     
     try:
         if not discord_client:
@@ -136,7 +147,7 @@ async def send_startup_notification(server_configs: list[ServerConfig]) -> None:
         
         sent_count = 0
         for server_config in server_configs:
-            if await send_bot_update(server_config, startup_embed, discord_client):
+            if await send_bot_update(server_config, startup_embed, discord_client, use_fallback=True):
                 sent_count += 1
         
         logger.info(f"Startup notifications sent to {sent_count} servers")
@@ -224,7 +235,7 @@ async def send_feature_update(
         
         sent_count = 0
         for server_config in server_configs:
-            if await send_bot_update(server_config, update_embed, discord_client):
+            if await send_bot_update(server_config, update_embed, discord_client, use_fallback=True):
                 sent_count += 1
         
         logger.info(f"Feature update notifications sent to {sent_count} servers")

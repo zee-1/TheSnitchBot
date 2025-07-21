@@ -50,6 +50,8 @@ class HelpCommand(PublicCommand):
                 "`/config set-persona <persona>` - Set bot personality (sassy_reporter, investigative_journalist, gossip_columnist, sports_commentator, weather_anchor, conspiracy_theorist)",
                 "`/config set-newsletter-channel [channel]` - Set newsletter delivery channel (uses current channel if none specified)", 
                 "`/config set-newsletter-time <time>` - Set newsletter delivery time in HH:MM UTC format (e.g., 09:00, 14:30)",
+                "`/config set-output-channel [channel]` - Set channel for command outputs (breaking news, leaks, etc.)",
+                "`/config set-bot-updates-channel [channel]` - Set channel for bot status updates and notifications (startup, features, errors)",
                 "`/config status` - View complete bot configuration and feature status"
             ]
             

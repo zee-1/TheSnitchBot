@@ -407,6 +407,5 @@ async def controversy_check_context_menu(interaction: discord.Interaction, messa
     await controversy_cmd.execute(ctx, message_id=str(message.id))
 
 
-# Register the command
-from src.discord_bot.commands.base import command_registry
-command_registry.register(ControversyCheckCommand())
+# Command is now handled by /content controversy-check app command and context menu
+# No need to register in old command registry

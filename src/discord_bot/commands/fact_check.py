@@ -606,9 +606,5 @@ async def fact_check_context_menu(interaction: discord.Interaction, message: dis
     await fact_check_cmd.execute(ctx, message_id=str(message.id))
 
 
-# Register the commands
-from src.discord_bot.commands.base import command_registry
-command_registry.register(FactCheckCommand())
-
-# Note: Context menu commands need to be registered separately in the bot setup
-# This is handled in the bot.py file during command sync
+# Command is now handled by /content fact-check app command and context menu
+# No need to register in old command registry

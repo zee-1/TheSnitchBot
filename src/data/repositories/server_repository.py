@@ -109,6 +109,38 @@ class ServerRepository(BaseRepository[ServerConfig]):
             logger.error(f"Failed to update newsletter channel for server {server_id}: {e}")
             return False
     
+    async def update_bot_updates_channel(self, server_id: str, channel_id: str) -> bool:
+        """Update bot updates channel for a server."""
+        try:
+            server_config = await self.get_by_server_id_partition(server_id)
+            if not server_config:
+                return False
+            
+            server_config.bot_updates_channel_id = channel_id
+            await self.update(server_config)
+            
+            logger.info(f"Updated bot updates channel for server {server_id}: {channel_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to update bot updates channel for server {server_id}: {e}")
+            return False
+
+    async def update_output_channel(self, server_id: str, channel_id: str) -> bool:
+        """Update output channel for a server."""
+        try:
+            server_config = await self.get_by_server_id_partition(server_id)
+            if not server_config:
+                return False
+            
+            server_config.output_channel_id = channel_id
+            await self.update(server_config)
+            
+            logger.info(f"Updated output channel for server {server_id}: {channel_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to update output channel for server {server_id}: {e}")
+            return False
+
     async def update_newsletter_time(self, server_id: str, newsletter_time: str) -> bool:
         """Update newsletter delivery time for a server."""
         try:

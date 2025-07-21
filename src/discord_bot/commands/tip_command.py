@@ -168,6 +168,5 @@ class SubmitTipCommand(PublicCommand):
             logger.error(f"Unexpected error in tip submission: {e}", exc_info=True)
 
 
-# Register the command
-from src.discord_bot.commands.base import command_registry
-command_registry.register(SubmitTipCommand())
+# Command is now handled by /content submit-tip app command
+# No need to register in old command registry
