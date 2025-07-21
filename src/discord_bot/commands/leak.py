@@ -4,7 +4,7 @@ Generates harmless, humorous fake "leaks" about random users.
 """
 
 import discord
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 import random
 from datetime import datetime, timedelta
 
@@ -24,8 +24,27 @@ class LeakCommand(PublicCommand):
             cooldown_seconds=20  # Higher cooldown to prevent spam
         )
     
-    async def execute(self, ctx: CommandContext, **kwargs) -> None:
-        """Execute the leak command."""
+    def define_parameters(self) -> Dict[str, Dict[str, Any]]:
+        """Define command parameters for Discord."""
+        return {
+            "persona": {
+                "type": str,
+                "description": "Choose the personality style for the leak",
+                "required": False,
+                "default": None,  # Will use server default
+                "choices": [
+                    "sassy_reporter",
+                    "investigative_journalist", 
+                    "gossip_columnist",
+                    "sports_commentator",
+                    "weather_anchor",
+                    "conspiracy_theorist"
+                ]
+            }
+        }
+    
+    async def execute(self, ctx: CommandContext, persona: Optional[str] = None, **kwargs) -> None:
+        """Execute the leak command with optional persona selection."""
         
         logger.info(
             "Leak command executed",
@@ -82,19 +101,23 @@ class LeakCommand(PublicCommand):
             
             logger.info(f"Enhanced user selector chose: {target_name} (ID: {target_user_id}) from {selected_user_info.get('message_count', 0)} recent messages")
             
+            # Determine which persona to use
+            selected_persona = self._get_selected_persona(persona, ctx.server_config.persona)
+            logger.info(f"Using persona: {selected_persona}")
+            
             # Generate AI-powered personalized leak
             try:
                 settings = ctx.container.get_settings()
                 if settings.mock_ai_responses:
-                    leak_content = self._generate_mock_leak(target_name, ctx.server_config.persona, recent_messages)
+                    leak_content = self._generate_mock_leak(target_name, selected_persona, recent_messages)
                 else:
                     # Use Groq AI for personalized leaks
-                    leak_content = await self._generate_ai_leak(target_name, target_user_id, ctx, recent_messages)
+                    leak_content = await self._generate_ai_leak(target_name, target_user_id, ctx, recent_messages, selected_persona)
                     from pprint import pprint
                     pprint(leak_content)
             except Exception as ai_error:
                 logger.warning(f"AI leak generation failed, falling back to mock: {ai_error}")
-                leak_content = self._generate_mock_leak(target_name, ctx.server_config.persona, recent_messages)
+                leak_content = self._generate_mock_leak(target_name, selected_persona, recent_messages)
             
             # Create leak embed
             embed = discord.Embed(
@@ -157,20 +180,20 @@ class LeakCommand(PublicCommand):
             await ctx.respond(embed=embed)
             logger.error(f"Error in leak command: {e}", exc_info=True)
     
-    async def _generate_ai_leak(self, target_name: str, target_user_id: str, ctx: CommandContext, recent_messages: list) -> str:
+    async def _generate_ai_leak(self, target_name: str, target_user_id: str, ctx: CommandContext, recent_messages: list, persona) -> str:
         """Generate AI-powered personalized leak using Chain of Thoughts approach."""
         try:
             # Check if CoT is enabled for this server
             if ctx.server_config.leak_cot_enabled:
-                return await self._generate_ai_leak_with_cot(target_name, target_user_id, ctx, recent_messages)
+                return await self._generate_ai_leak_with_cot(target_name, target_user_id, ctx, recent_messages, persona)
             else:
                 logger.info("CoT disabled for this server, using legacy approach")
-                return await self._generate_ai_leak_legacy(target_name, target_user_id, ctx, recent_messages)
+                return await self._generate_ai_leak_legacy(target_name, target_user_id, ctx, recent_messages, persona)
         except Exception as e:
             logger.warning(f"CoT leak generation failed, falling back to legacy approach: {e}")
-            return await self._generate_ai_leak_legacy(target_name, target_user_id, ctx, recent_messages)
+            return await self._generate_ai_leak_legacy(target_name, target_user_id, ctx, recent_messages, persona)
 
-    async def _generate_ai_leak_with_cot(self, target_name: str, target_user_id: str, ctx: CommandContext, recent_messages: list) -> str:
+    async def _generate_ai_leak_with_cot(self, target_name: str, target_user_id: str, ctx: CommandContext, recent_messages: list, persona) -> str:
         """Generate AI-powered leak using Chain of Thoughts approach."""
         try:
             from src.ai import get_ai_service
@@ -193,7 +216,7 @@ class LeakCommand(PublicCommand):
             content_planner = ContentPlanner(ai_service.groq_client)
             content_plan = await content_planner.plan_content(
                 context_analysis=context_analysis,
-                persona=ctx.server_config.persona,
+                persona=persona,
                 content_guidelines=self._get_content_guidelines()
             )
             
@@ -202,7 +225,7 @@ class LeakCommand(PublicCommand):
             leak_writer = LeakWriter(ai_service.groq_client)
             final_content = await leak_writer.write_leak(
                 content_plan=content_plan,
-                persona=ctx.server_config.persona,
+                persona=persona,
                 format_requirements=self._get_format_requirements(),
                 target_name=target_name
             )
@@ -215,7 +238,7 @@ class LeakCommand(PublicCommand):
             logger.error(f"CoT leak generation failed: {e}")
             raise  # Re-raise to trigger fallback
 
-    async def _generate_ai_leak_legacy(self, target_name: str, target_user_id: str, ctx: CommandContext, recent_messages: list) -> str:
+    async def _generate_ai_leak_legacy(self, target_name: str, target_user_id: str, ctx: CommandContext, recent_messages: list, persona) -> str:
         """Legacy AI leak generation (fallback method)."""
         try:
             from src.ai import get_ai_service
@@ -242,14 +265,14 @@ class LeakCommand(PublicCommand):
                 "target_messages": target_messages[-10:],  # Last 5 messages from target
                 "other_users": dict(list(other_users.items())[:10]),  # Top 3 other active users
                 "server_name": ctx.interaction.guild.name if ctx.interaction.guild else "this server",
-               "persona": ctx.server_config.persona
+               "persona": persona
             }
             
             # Create simplified AI prompt for leak generation
             prompt = f"""Create a humorous, harmless "leak" about {target_name} for a Discord server gossip bot.
 
 USER CONTEXT: {target_name} recently active in {context_info['server_name']}
-PERSONA: {ctx.server_config.persona}
+PERSONA: {persona}
 RECENT TOPICS: {', '.join(target_messages[-3:]) if target_messages else 'general chat'}
 
 Generate a single, entertaining leak (max 150 characters) that is:
@@ -277,7 +300,7 @@ Just return the leak content, nothing else."""
         except Exception as e:
             logger.error(f"Legacy AI leak generation failed: {e}")
             # Final fallback to mock
-            return self._generate_mock_leak(target_name, ctx.server_config.persona, recent_messages)
+            return self._generate_mock_leak(target_name, persona, recent_messages)
     
     def _generate_mock_leak(self, target_name: str, persona: str, recent_messages: list) -> str:
         """Generate a humorous fake leak about a user with some personalization."""
@@ -341,6 +364,20 @@ Just return the leak content, nothing else."""
         templates = leak_templates.get(persona, default_templates)
         
         return random.choice(templates)
+
+    def _get_selected_persona(self, user_choice: Optional[str], server_default):
+        """Determine which persona to use based on user choice and server default."""
+        if user_choice:
+            # Convert user choice string to PersonaType enum
+            try:
+                from src.models.server import PersonaType
+                return PersonaType(user_choice)
+            except (ValueError, AttributeError):
+                logger.warning(f"Invalid persona choice '{user_choice}', using server default")
+                return server_default
+        else:
+            # Use server default
+            return server_default
 
     def _get_content_guidelines(self) -> Dict[str, Any]:
         """Get content safety and style guidelines for CoT chains."""
