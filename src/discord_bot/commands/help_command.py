@@ -34,62 +34,79 @@ class HelpCommand(PublicCommand):
         try:
             # Create help embed
             embed = discord.Embed(
-                title="🤖 The Snitch Bot - Command Help",
-                description="I'm here to keep your community entertained with daily newsletters and breaking news!",
+                title="🤖 The Snitch Bot - Complete Command Reference",
+                description=(
+                    "**Welcome to The Snitch!** 🕵️\n\n"
+                    "I'm your AI-powered community reporter, ready to transform server activity into "
+                    "entertaining content! From daily newsletters to real-time breaking news, "
+                    "I'll keep your community engaged with intelligent analysis and personality.\n\n"
+                    "**Quick Start:** `/config set-persona` → `/config set-newsletter-channel` → You're ready!"
+                ),
                 color=discord.Color.blue()
             )
             
-            # Admin Commands
-            admin_commands = [
-                "`/config set-persona` - Set bot personality (sassy, investigative, sports, etc.)",
-                "`/config set-newsletter-channel` - Set newsletter channel", 
-                "`/config set-newsletter-time` - Set newsletter time and timezone",
-                "`/config set-whitelist-channels` - Set channels to monitor",
-                "`/config set-blacklist-words` - Set words to ignore",
-                "`/config bot-status` - View current bot configuration"
+            # Admin Commands - Configuration & Management
+            admin_config_commands = [
+                "`/config set-persona <persona>` - Set bot personality (sassy_reporter, investigative_journalist, gossip_columnist, sports_commentator, weather_anchor, conspiracy_theorist)",
+                "`/config set-newsletter-channel [channel]` - Set newsletter delivery channel (uses current channel if none specified)", 
+                "`/config set-newsletter-time <time>` - Set newsletter delivery time in HH:MM UTC format (e.g., 09:00, 14:30)",
+                "`/config status` - View complete bot configuration and feature status"
+            ]
+            
+            admin_tip_commands = [
+                "`/approve-tip <tip_id> <action> [notes]` - Approve, process, or dismiss submitted tips",
+                "`/list-tips [status] [priority]` - List submitted tips with filtering options",
+                "`/tip-stats [days]` - View tip submission statistics and analytics"
             ]
             
             embed.add_field(
-                name="👑 Admin Commands",
-                value="\n".join(admin_commands),
+                name="👑 Admin - Configuration",
+                value="\n".join(admin_config_commands),
                 inline=False
             )
             
-            # Content Commands
+            embed.add_field(
+                name="👑 Admin - Tip Management", 
+                value="\n".join(admin_tip_commands),
+                inline=False
+            )
+            
+            # Content Generation Commands
             content_commands = [
-                "`/content breaking-news` - Generate breaking news from recent activity",
-                "`/content fact-check` - Fact-check a message (reply to message and use command)",
-                "`/content controversy-check` - Analyze how controversial a message is (reply to use)",
-                "`/content submit-tip` - Submit anonymous tips for investigation"
+                "`/content breaking-news [count] [hours]` - Generate breaking news from recent activity (10-100 messages, 1-24 hours)",
+                "`/content fact-check [message_id]` - Fact-check a message with humorous verdict (or use right-click context menu)",
+                "`/content controversy-check [message_id]` - Analyze controversy level of a message (or use right-click context menu)",
+                "`/content submit-tip <content> [category] [anonymous]` - Submit anonymous tips for investigation with categories"
             ]
             
-            # Other Public Commands  
+            # Public Commands  
             public_commands = [
-                "`/leak` - Get exclusive server insights and rumors",
-                "`/help` - Show this help message"
+                "`/leak` - Get exclusive server insights, rumors, and behind-the-scenes information",
+                "`/help` - Show this comprehensive help message with all commands"
             ]
             
             embed.add_field(
-                name="📰 Content Commands", 
+                name="📰 Content Generation", 
                 value="\n".join(content_commands),
                 inline=False
             )
             
             embed.add_field(
-                name="📢 Other Commands", 
+                name="📢 Public Commands", 
                 value="\n".join(public_commands),
                 inline=False
             )
             
             # Bot Features
             features = [
-                "🗞️ Daily automated newsletters with AI analysis",
-                "📊 Message analysis and controversy detection", 
-                "🤖 Multiple personality modes (sassy, investigative, sports, conspiracy)",
-                "⚡ Real-time breaking news from channel activity",
-                "🔍 Humorous fact-checking with context menu support",
-                "🕵️ Anonymous tip submission system",
-                "📈 Smart content categorization and trending topics"
+                "🗞️ **Daily Newsletters** - AI-generated summaries of server activity with personality",
+                "📊 **Smart Analysis** - Message controversy detection and community insights", 
+                "🤖 **Multiple Personas** - 6 unique personalities (sassy reporter, investigative journalist, etc.)",
+                "⚡ **Breaking News** - Real-time news generation from channel activity patterns",
+                "🔍 **Fact-Checking** - Humorous fact-checking with context menu support",
+                "🕵️ **Tip System** - Anonymous submission, categorization, and management workflow",
+                "📈 **Content Analytics** - Smart categorization, trending topics, and engagement metrics",
+                "🎯 **Context Menus** - Right-click messages for quick fact-check and controversy analysis"
             ]
             
             embed.add_field(
@@ -100,10 +117,12 @@ class HelpCommand(PublicCommand):
             
             # Usage Tips
             usage_tips = [
-                "💡 **Quick tip**: Reply to any message and use `/content fact-check` or `/content controversy-check`",
-                "📝 **Tip submission**: Use `/content submit-tip` to report interesting information",
-                "⏰ **Newsletters**: Set up automatic daily newsletters with `/config set-newsletter-channel`",
-                "🎭 **Personalities**: Try different bot personalities with `/config set-persona`"
+                "💡 **Context Menus**: Right-click any message → Apps → 'Fact Check' or 'Controversy Check' for quick analysis",
+                "📝 **Tip Categories**: Use `/content submit-tip` with categories: general, drama, controversy, breaking_news, rumor, investigation",
+                "⏰ **Newsletter Setup**: Set channel with `/config set-newsletter-channel`, time with `/config set-newsletter-time`",
+                "🎭 **Persona Examples**: Try 'sassy_reporter' for attitude, 'conspiracy_theorist' for fun theories",
+                "📊 **Parameter Ranges**: Breaking news supports 10-100 messages and 1-24 hour time windows",
+                "🔧 **Admin Tools**: Use `/config status` to see complete configuration and `/list-tips` to manage submissions"
             ]
             
             embed.add_field(
@@ -132,29 +151,53 @@ class HelpCommand(PublicCommand):
                     inline=True
                 )
             
+            # Command Syntax Guide
+            syntax_guide = [
+                "📝 **Parameter Types:**",
+                "• `<required>` - Must provide this parameter",
+                "• `[optional]` - Optional parameter with default value",
+                "• `<choice1|choice2>` - Choose one of the listed options",
+                "",
+                "📱 **Context Menus:** Right-click any message → Apps → Select analysis tool",
+                "⚡ **Quick Access:** Most commands work without parameters using smart defaults"
+            ]
+            
+            embed.add_field(
+                name="📖 Command Syntax Guide",
+                value="\n".join(syntax_guide),
+                inline=False
+            )
+            
             # Setup Info
             setup_info = []
+            recommendations = []
+            
             if not ctx.server_config.newsletter_channel_id:
                 setup_info.append("⚠️ Newsletter channel not set")
+                recommendations.append("• Run `/config set-newsletter-channel` to enable daily newsletters")
             if not ctx.server_config.newsletter_enabled:
                 setup_info.append("⚠️ Newsletter disabled")
             if not ctx.server_config.tip_submission_enabled:
                 setup_info.append("⚠️ Tip submission disabled")
+                recommendations.append("• Enable tips for community engagement and content ideas")
+            
+            if ctx.server_config.persona == "sassy_reporter":
+                recommendations.append("• Try different personas with `/config set-persona` for variety")
             
             if setup_info:
                 embed.add_field(
-                    name="⚙️ Setup Required",
-                    value="\n".join(setup_info) + "\n\nContact an admin to configure the bot.",
+                    name="⚙️ Configuration Status",
+                    value="\n".join(setup_info) + "\n\n**Recommendations:**\n" + "\n".join(recommendations) + "\n\n*Contact an admin to complete setup.*",
                     inline=False
                 )
             else:
                 embed.add_field(
                     name="✅ Bot Status",
-                    value="Fully configured and ready!",
+                    value=f"**Fully configured and ready!**\n\n🎭 Current Persona: **{ctx.server_config.persona.replace('_', ' ').title()}**\n📰 Newsletter: **{'Enabled' if ctx.server_config.newsletter_enabled else 'Disabled'}**\n🕵️ Tips: **{'Enabled' if ctx.server_config.tip_submission_enabled else 'Disabled'}**",
                     inline=False
                 )
             
-            embed.set_footer(text="Use /config bot-status for detailed configuration info")
+            embed.set_footer(text="Use /config status for detailed configuration • Parameters: <required> [optional]")
             
             await ctx.respond(embed=embed)
             
