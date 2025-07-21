@@ -110,7 +110,7 @@ class SnitchBot(commands.Bot):
             all_server_configs = await server_repo.get_active_servers()
             
             from src.discord_bot.utils.channel_utils import send_startup_notification
-            await send_startup_notification(all_server_configs)
+            await send_startup_notification(all_server_configs, self)
         except Exception as e:
             logger.error(f"Failed to send startup notifications: {e}")
     
@@ -596,11 +596,17 @@ class SnitchBot(commands.Bot):
                 logger.info(f"Insufficient messages for newsletter in server {config.server_id}")
                 return
             
-            # Create newsletter object
+            # Create newsletter object with all required fields
             from src.models.newsletter import Newsletter
+            current_time = datetime.now()
             newsletter = Newsletter(
                 server_id=config.server_id,
-                newsletter_date=datetime.now().date()
+                newsletter_date=current_time.date(),
+                title=f"Daily Newsletter - {current_time.strftime('%B %d, %Y')}",
+                time_period_start=cutoff_time,
+                time_period_end=current_time,
+                analyzed_messages_count=len(recent_messages),
+                persona_used=config.persona
             )
             
             # Generate using AI service

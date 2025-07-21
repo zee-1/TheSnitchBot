@@ -125,6 +125,22 @@ class ServerRepository(BaseRepository[ServerConfig]):
             logger.error(f"Failed to update bot updates channel for server {server_id}: {e}")
             return False
 
+    async def update_source_channel(self, server_id: str, channel_id: str) -> bool:
+        """Update source channel for a server."""
+        try:
+            server_config = await self.get_by_server_id_partition(server_id)
+            if not server_config:
+                return False
+            
+            server_config.source_channel_id = channel_id
+            await self.update(server_config)
+            
+            logger.info(f"Updated source channel for server {server_id}: {channel_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to update source channel for server {server_id}: {e}")
+            return False
+
     async def update_output_channel(self, server_id: str, channel_id: str) -> bool:
         """Update output channel for a server."""
         try:

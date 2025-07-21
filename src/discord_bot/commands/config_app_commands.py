@@ -135,7 +135,7 @@ class ConfigCommands(app_commands.Group):
             logger.error(f"Error in set-persona command: {e}", exc_info=True)
     
     @app_commands.command(name="set-newsletter-channel", description="Set the newsletter delivery channel")
-    @app_commands.describe(channel="The channel where newsletters will be posted")
+    @app_commands.describe(channel="The channel where daily newsletters will be posted")
     async def set_newsletter_channel(
         self, 
         interaction: discord.Interaction, 
@@ -362,8 +362,91 @@ class ConfigCommands(app_commands.Group):
             await interaction.followup.send(embed=embed)
             logger.error(f"Error in set-bot-updates-channel command: {e}", exc_info=True)
     
-    @app_commands.command(name="set-output-channel", description="Set the channel for command outputs (breaking news, leaks, etc.)")
-    @app_commands.describe(channel="The channel where command outputs will be posted (optional, uses current channel if not specified)")
+    @app_commands.command(name="set-source-channel", description="Set which channel bot reads from for context and content analysis")
+    @app_commands.describe(channel="Channel the bot monitors for messages to analyze (optional, uses current channel if not specified)")
+    async def set_source_channel(
+        self, 
+        interaction: discord.Interaction, 
+        channel: Optional[discord.TextChannel] = None
+    ):
+        """Set the source channel for bot to read from."""
+        # Defer immediately to prevent timeout
+        await interaction.response.defer(ephemeral=False)
+        
+        server_config, can_proceed = await self._get_server_config(interaction)
+        if not can_proceed:
+            return
+            
+        # Use current channel if none specified
+        target_channel = channel or interaction.channel
+        
+        try:
+            # Check bot permissions in target channel
+            bot_member = interaction.guild.me
+            channel_perms = target_channel.permissions_for(bot_member)
+            
+            missing_perms = []
+            if not channel_perms.read_messages:
+                missing_perms.append("Read Messages")
+            if not channel_perms.read_message_history:
+                missing_perms.append("Read Message History")
+            
+            if missing_perms:
+                embed = EmbedBuilder.warning(
+                    "Missing Permissions",
+                    f"I don't have the following permissions in {target_channel.mention}:\n"
+                    f"```{', '.join(missing_perms)}```\n"
+                    f"Please grant these permissions and try again."
+                )
+                await interaction.followup.send(embed=embed)
+                return
+            
+            # Update source channel
+            server_repo = self.container.get_server_repository()
+            success = await server_repo.update_source_channel(
+                str(interaction.guild_id), str(target_channel.id)
+            )
+            
+            if success:
+                embed = EmbedBuilder.success(
+                    "Source Channel Updated",
+                    f"🔍 **Bot will now READ from {target_channel.mention} for content analysis!** 📖\n\n"
+                    f"**What the bot does here:**\n"
+                    f"• Analyzes messages for breaking news\n"
+                    f"• Gathers context for leaks and insights\n"
+                    f"• Monitors activity for newsletter content\n"
+                    f"• Reads conversation patterns and trends"
+                )
+                
+                embed.add_field(
+                    name="📋 Required Permissions",
+                    value="✅ Read Messages\n✅ Read Message History",
+                    inline=True
+                )
+                
+                embed.add_field(
+                    name="📖 How It Works",
+                    value="Bot silently monitors this channel to understand server activity and context",
+                    inline=False
+                )
+            else:
+                embed = EmbedBuilder.error(
+                    "Update Failed",
+                    "Failed to update source channel. Please try again."
+                )
+            
+            await interaction.followup.send(embed=embed)
+            
+        except Exception as e:
+            embed = EmbedBuilder.error(
+                "Command Failed",
+                "An error occurred while updating the source channel."
+            )
+            await interaction.followup.send(embed=embed)
+            logger.error(f"Error in set-source-channel command: {e}", exc_info=True)
+
+    @app_commands.command(name="set-output-channel", description="Set where bot sends all responses (breaking news, leaks, fact-checks, etc.)")
+    @app_commands.describe(channel="Channel where bot will send all outputs and responses (optional, uses current channel if not specified)")
     async def set_output_channel(
         self, 
         interaction: discord.Interaction, 
@@ -410,11 +493,13 @@ class ConfigCommands(app_commands.Group):
             if success:
                 embed = EmbedBuilder.success(
                     "Output Channel Updated",
-                    f"Command outputs will now be sent to {target_channel.mention}! 📤\n\n"
-                    f"The following commands will use this channel:\n"
-                    f"• `/content breaking-news`\n"
-                    f"• `/leak`\n"
-                    f"• Other content generation commands"
+                    f"🎯 **Bot will now send ALL responses to {target_channel.mention}!** 📤\n\n"
+                    f"**What gets sent here:**\n"
+                    f"• Breaking news bulletins\n"
+                    f"• Server leaks and insights\n"
+                    f"• Fact-check results\n"
+                    f"• Controversy analysis\n"
+                    f"• All bot-generated content"
                 )
                 
                 embed.add_field(
@@ -424,8 +509,8 @@ class ConfigCommands(app_commands.Group):
                 )
                 
                 embed.add_field(
-                    name="📍 Channel Usage",
-                    value="Content will be posted here instead of where commands are used",
+                    name="📍 How It Works",
+                    value="Commands will respond with confirmation, but all content goes to this output channel",
                     inline=False
                 )
             else:
@@ -495,6 +580,20 @@ class ConfigCommands(app_commands.Group):
                 embed.add_field(
                     name="📍 Newsletter Channel",
                     value="⚠️ Not configured",
+                    inline=True
+                )
+            
+            # Source channel
+            if server_config.source_channel_id:
+                embed.add_field(
+                    name="📖 Source Channel",
+                    value=f"<#{server_config.source_channel_id}>",
+                    inline=True
+                )
+            else:
+                embed.add_field(
+                    name="📖 Source Channel",
+                    value="⚠️ Not configured (bot monitors all channels)",
                     inline=True
                 )
             

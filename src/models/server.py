@@ -47,6 +47,7 @@ class ServerConfig(CosmosDBEntity):
     last_newsletter_sent: Optional[str] = Field(None, description="Last newsletter timestamp (ISO format)")
     
     # Channel settings
+    source_channel_id: Optional[str] = Field(None, description="Channel bot reads from for context and content analysis")
     output_channel_id: Optional[str] = Field(None, description="Channel for command outputs (breaking news, leaks, etc)")
     bot_updates_channel_id: Optional[str] = Field(None, description="Channel for bot status updates and notifications")
     
@@ -97,7 +98,7 @@ class ServerConfig(CosmosDBEntity):
             raise ValueError("Owner ID must be a valid Discord snowflake")
         return v
     
-    @field_validator("newsletter_channel_id", "output_channel_id", "bot_updates_channel_id")
+    @field_validator("newsletter_channel_id", "source_channel_id", "output_channel_id", "bot_updates_channel_id")
     @classmethod
     def validate_channel_ids(cls, v):
         """Validate Discord channel ID format."""
@@ -151,6 +152,10 @@ class ServerConfig(CosmosDBEntity):
             return True
         return channel_id in self.whitelisted_channels
     
+    def get_source_channel(self) -> Optional[str]:
+        """Get the configured source channel for reading context."""
+        return self.source_channel_id
+    
     def get_output_channel(self) -> Optional[str]:
         """Get the configured output channel for command responses."""
         return self.output_channel_id
@@ -158,6 +163,11 @@ class ServerConfig(CosmosDBEntity):
     def get_bot_updates_channel(self) -> Optional[str]:
         """Get the configured bot updates channel."""
         return self.bot_updates_channel_id
+    
+    def set_source_channel(self, channel_id: Optional[str]) -> None:
+        """Set the source channel for reading context."""
+        self.source_channel_id = channel_id
+        self.update_timestamp()
     
     def set_output_channel(self, channel_id: Optional[str]) -> None:
         """Set the output channel for command responses."""

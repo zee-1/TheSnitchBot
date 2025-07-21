@@ -29,14 +29,14 @@ async def send_to_output_channel(
     
     if output_channel_id and output_channel_id != ctx.channel_id:
         try:
-            # Get the Discord client to send to output channel
-            settings = ctx.container.get_settings()
-            from src.discord_bot.client import get_discord_client
-            discord_client = await get_discord_client(settings)
-            output_channel = await discord_client.get_channel(output_channel_id)
+            # Use the bot instance from the interaction (already connected)
+            bot = ctx.interaction.client
+            logger.info(f"Attempting to send to output channel {output_channel_id}")
+            output_channel = bot.get_channel(int(output_channel_id))
             
             if output_channel:
                 await output_channel.send(embed=embed)
+                logger.info(f"Successfully sent to output channel {output_channel.name}")
                 
                 # Send confirmation to command channel
                 confirmation_embed = EmbedBuilder.success(
@@ -49,7 +49,7 @@ async def send_to_output_channel(
                 logger.warning(f"Output channel {output_channel_id} not found, using current channel")
                 await ctx.respond(embed=embed)
         except Exception as e:
-            logger.warning(f"Failed to send to output channel: {e}")
+            logger.error(f"Failed to send to output channel {output_channel_id}: {e}")
             # Fallback to current channel
             await ctx.respond(embed=embed)
     else:
@@ -98,7 +98,7 @@ async def send_bot_update(
             from src.discord_bot.client import get_discord_client
             discord_client = await get_discord_client(settings)
         
-        bot_updates_channel = await discord_client.get_channel(bot_updates_channel_id)
+        bot_updates_channel = discord_client.get_channel(int(bot_updates_channel_id))
         
         if bot_updates_channel:
             await bot_updates_channel.send(embed=embed)
@@ -113,22 +113,26 @@ async def send_bot_update(
         return False
 
 
-async def send_startup_notification(server_configs: list[ServerConfig]) -> None:
+async def send_startup_notification(server_configs: list[ServerConfig], bot_instance=None) -> None:
     """
     Send startup notification to all configured bot updates channels.
     
     Args:
         server_configs: List of server configurations
+        bot_instance: Bot instance to use for sending messages (optional)
     """
     if not server_configs:
         return
     
     try:
-        from src.core.dependencies import get_container
-        container = await get_container()
-        settings = container.get_settings()
-        from src.discord_bot.client import get_discord_client
-        discord_client = await get_discord_client(settings)
+        # Use provided bot instance or try to get one
+        discord_client = bot_instance
+        if not discord_client:
+            from src.core.dependencies import get_container
+            container = await get_container()
+            settings = container.get_settings()
+            from src.discord_bot.client import get_discord_client
+            discord_client = await get_discord_client(settings)
         
         startup_embed = EmbedBuilder.success(
             "🤖 The Snitch Bot Started",

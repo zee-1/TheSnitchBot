@@ -48,7 +48,7 @@ class LeakCommand(PublicCommand):
             
             # Fetch recent messages from the channel
             recent_messages = []
-            async for message in channel.history(limit=100):
+            async for message in channel.history(limit=200):
                 recent_messages.append(message)
             
             # Collect unique active users (excluding bots and the command user)
@@ -190,43 +190,32 @@ class LeakCommand(PublicCommand):
             
             # Create AI prompt for leak generation
             prompt = f"""Create a humorous, harmless "leak" about {target_name} for a Discord server gossip bot called "The Snitch". 
+"Alright, Snitch Squad! 🕵️‍♀️ It's time to spill some piping hot, totally innocent tea for "The Snitch" gossip bot on our Discord server! Your mission, should you choose to accept it, is to cook up a hilarious, slightly embarrassing, but *completely harmless* "leak" about {target_name}.
 
-IMPORTANT GUIDELINES:
-- can be maximum 4096 character long. containing 20-30 words at MAX.
-- Keep it completely innocent and fun
-- No sexual content, no cussing, no inappropriate material
-- Make it embarrassing but harmless (like silly habits, funny moments, etc.)
-- Can be slightly 18+ in terms of maturity (like mentioning dating, having crushes, etc.) but stay classy
-- Base it on recent chat patterns if possible
-- Include other server members if it makes the leak funnier
-- Make it sound like genuine gossip but obviously fake
+**Here's the 411:**
+-   **Length:** Keep it short and sweet, max 20-30 words. We're talking quick, punchy gossip that hits different.
+-   **Vibe Check:** This *has* to be innocent, fun, and embarrassing in the most wholesome way. Absolutely NO cussing, sexual content, or anything inappropriate. Think "OMG, I can't believe they did that!" not "OMG, they're cancelled!"
+-   **Maturity:** It's cool to hint at light 18+ themes like crushes, dating fails, or awkward romantic situations, but keep it super classy and tasteful. A bit spicy deets! But not crossing limits
+-   **Authenticity:** Make it sound like genuine, juicy (but obviously fake) server gossip.
+-   **Slang Game Strong:** Inject some current internet slang and youth-speak naturally. Think "rizz," "simp," "bet," "no cap," "it's giving," "main character energy," "IYKYK," "glow up," "ratio'd," etc. (use sparingly and organically).
 
-PERSONA STYLE: {context_info['persona']} 
-- sassy_reporter: dramatic, gossipy, uses "tea" and drama language
-- investigative_journalist: formal, detailed, "sources confirm" style  
-- sports_commentator: energetic, play-by-play style with caps
-- conspiracy_theorist: dramatic, "WAKE UP SHEEPLE" style with conspiracies
+**TOPIC DRAFT - LET'S DIVERSIFY THE TEA!**
+We need a *wide variety* of topics, so **DO NOT** give excessive weight to just one area (like gaming or Discord habits). Mix it up! Here are some ideas to get your gossip gears turning:
+-   Funny social media blunders or attempts at viral trends (e.g., a failed TikTok dance, an embarrassing Insta story, getting ratio'd on Twitter).
+-   Awkward real-life encounters or public mishaps (e.g., tripping in public, mispronouncing a word in a cringe way, getting caught singing off-key).
+-   Relatable dating/crush drama (e.g., getting ghosted by their crush, a hilarious first date fail, a secret crush reveal gone wrong—keep it light and funny!).
+-   Obsessions with pop culture (e.g., binging a super cheesy show, stanning a niche artist, having a weird fan theory, being obsessed with a meme).
+-   Quirky personal habits or fashion choices (e.g., always wearing mismatched socks, having a secret love for Crocs, a questionable fashion "glow up" attempt).
+-   Silly Discord behaviors (e.g., accidentally muting themselves mid-rant, spamming ancient emojis, falling asleep on voice chat).
+-   Hilarious social interactions with other server members (e.g., {target_name} trying to impress {other_active_members[0]} and failing spectacularly, a funny misunderstanding with {other_active_members[1]}).
 
-SERVER CONTEXT:
-- Target: {target_name}
-- Server: {context_info['server_name']}
-- Recent activity patterns: {', '.join(target_messages[-2:]) if target_messages else 'minimal activity'}
-- Other active members: {', '.join(list(other_users.keys())[:3]) if other_users else 'none'}
+**SERVER CONTEXT (for personalization):**
+-   **Target:** {target_name}
+-   **Server Name:** {context_info['server_name']}
+-   **Recent Activity Patterns (if available):** {', '.join(target_messages[-10:]) if target_messages else 'minimal activity'}
+-   **Other Active Members (if available):** {', '.join(list(other_users.keys())[:10]) if other_users else 'none'}
 
-Generate a single entertaining leak that could involve gossip about:
-- Funny gaming habits or fails
-- Silly Discord behaviors 
-- Harmless romantic situations (crushes, dating fails, etc.)
-- Embarrassing but innocent moments
-- Social interactions with other members
-- Pop culture obsessions or guilty pleasures
-example - 'sliding into DMs about', 'obsessing over', 'secretly judging people who dont like', 'writing love letters to', 'dreaming about','maintains a secret alliance with', 'has been exchanging coded messages with', 'shares classified intel with', 'plots world domination with', 'practices synchronized activities with'
-'carrying good luck charms for', 'performing pre-game rituals involving', 'coaching others in the art of', 'holding secret training sessions for', 'establishing dominance in'
-'obsessing over', 'writing poetry about', 'creating elaborate theories involving', 'collecting rare items related to', 'practicing rituals centered around'
-Make it server-specific and personalized based on the context provided.
-
-AI Output:
-XYZ Found playing with barbie in local park, police investigating.
+Your final output should be a single, entertaining, and harmless gossip leak. Make it server-specific and personalized based on the context provided.
 
 """
             # Get AI response
@@ -236,8 +225,8 @@ XYZ Found playing with barbie in local park, police investigating.
         # model: Optional[str] = None
             leak_content = await ai_service.groq_client.simple_completion(
                 prompt=prompt,
-                temperature=0.8,
-                max_tokens=150
+                temperature=0.9,
+                max_tokens=500
             )
             
             # Clean up the response and ensure it's appropriate length

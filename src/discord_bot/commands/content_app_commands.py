@@ -46,14 +46,14 @@ class ContentCommands(app_commands.Group):
     
     @app_commands.command(name="breaking-news", description="Generate breaking news from recent channel activity")
     @app_commands.describe(
-        message_count="Number of recent messages to analyze (10-100, default: 50)",
-        time_window="Hours of message history to analyze (1-24, default: 2)"
+        message_count="Number of recent messages to analyze (10-1000, default: 50)",
+        time_window="Hours of message history to analyze (1-49, default: 2)"
     )
     async def breaking_news(
         self,
         interaction: discord.Interaction,
-        message_count: Optional[app_commands.Range[int, 10, 100]] = 50,
-        time_window: Optional[app_commands.Range[int, 1, 24]] = 2
+        message_count: Optional[app_commands.Range[int, 10, 1000]] = 50,
+        time_window: Optional[app_commands.Range[int, 1, 48]] = 2
     ):
         """Generate breaking news bulletin from recent channel activity."""
         try:
