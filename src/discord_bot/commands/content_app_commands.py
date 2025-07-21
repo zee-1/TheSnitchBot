@@ -14,6 +14,7 @@ from src.discord_bot.commands.breaking_news import BreakingNewsCommand
 from src.discord_bot.commands.fact_check import FactCheckCommand
 from src.discord_bot.commands.tip_command import SubmitTipCommand
 from src.discord_bot.commands.controversy_check import ControversyCheckCommand
+from src.discord_bot.commands.community_pulse import CommunityPulseCommand
 
 logger = get_logger(__name__)
 
@@ -28,6 +29,7 @@ class ContentCommands(app_commands.Group):
         self.fact_check_cmd = FactCheckCommand()
         self.tip_cmd = SubmitTipCommand()
         self.controversy_cmd = ControversyCheckCommand()
+        self.pulse_cmd = CommunityPulseCommand()
     
     async def _create_context(self, interaction: discord.Interaction) -> CommandContext:
         """Create command context from interaction."""
@@ -184,6 +186,68 @@ class ContentCommands(app_commands.Group):
                 else:
                     await interaction.response.send_message(
                         "❌ An error occurred while analyzing controversy. Please try again later.",
+                        ephemeral=True
+                    )
+            except:
+                pass  # Ignore if we can't send error message
+    
+    @app_commands.command(name="community-pulse", description="Get real-time community insights and social dynamics")
+    @app_commands.describe(
+        timeframe="Time period to analyze",
+        style="Presentation style for the pulse report", 
+        focus="Specific aspect to focus on"
+    )
+    @app_commands.choices(timeframe=[
+        app_commands.Choice(name="Last Hour", value="1h"),
+        app_commands.Choice(name="Last 6 Hours", value="6h"),
+        app_commands.Choice(name="Last 24 Hours", value="24h"),
+        app_commands.Choice(name="Last Week", value="7d"),
+        app_commands.Choice(name="Last Month", value="30d")
+    ])
+    @app_commands.choices(style=[
+        app_commands.Choice(name="Dashboard", value="dashboard"),
+        app_commands.Choice(name="Story Mode", value="story"),
+        app_commands.Choice(name="Weather Report", value="weather"),
+        app_commands.Choice(name="Gaming Stats", value="gaming"),
+        app_commands.Choice(name="Social Network", value="network")
+    ])
+    @app_commands.choices(focus=[
+        app_commands.Choice(name="Overall Pulse", value="overall"),
+        app_commands.Choice(name="Social Connections", value="social"),
+        app_commands.Choice(name="Trending Topics", value="topics"),
+        app_commands.Choice(name="Mood Analysis", value="mood"),
+        app_commands.Choice(name="Activity Patterns", value="activity"),
+        app_commands.Choice(name="Hidden Patterns", value="patterns")
+    ])
+    async def community_pulse(
+        self,
+        interaction: discord.Interaction,
+        timeframe: Optional[str] = "24h",
+        style: Optional[str] = "dashboard",
+        focus: Optional[str] = "overall"
+    ):
+        """Generate community pulse analysis with social insights."""
+        try:
+            # Defer response since analysis takes time
+            await interaction.response.defer()
+            
+            # Create context
+            ctx = await self._create_context(interaction)
+            
+            # Execute the command
+            await self.pulse_cmd.execute(ctx, timeframe=timeframe, style=style, focus=focus)
+            
+        except Exception as e:
+            logger.error(f"Error in community-pulse app command: {e}", exc_info=True)
+            try:
+                if interaction.response.is_done():
+                    await interaction.followup.send(
+                        "❌ An error occurred while generating community pulse. Please try again later.",
+                        ephemeral=True
+                    )
+                else:
+                    await interaction.response.send_message(
+                        "❌ An error occurred while generating community pulse. Please try again later.",
                         ephemeral=True
                     )
             except:

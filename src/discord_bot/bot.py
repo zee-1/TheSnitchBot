@@ -27,6 +27,7 @@ import src.discord_bot.commands.help_command
 import src.discord_bot.commands.tip_command
 import src.discord_bot.commands.tip_management
 import src.discord_bot.commands.controversy_check
+import src.discord_bot.commands.community_pulse
 from src.models.server import ServerConfig, PersonaType
 from src.models.message import Message, ReactionData
 from src.ai import get_ai_service

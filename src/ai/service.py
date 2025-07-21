@@ -328,6 +328,262 @@ class AIService:
                 "analysis_timestamp": datetime.now().isoformat()
             }
     
+    async def generate_community_pulse(
+        self,
+        messages: List[Message],
+        metrics: Dict[str, Any],
+        server_config: ServerConfig,
+        timeframe: str,
+        style: str = "dashboard",
+        focus: str = "overall"
+    ) -> Dict[str, Any]:
+        """
+        Generate community pulse analysis with social insights.
+        
+        Args:
+            messages: Recent messages to analyze
+            metrics: Pre-calculated metrics
+            server_config: Server configuration
+            timeframe: Time period analyzed
+            style: Presentation style
+            focus: Focus area for analysis
+            
+        Returns:
+            Community pulse analysis results
+        """
+        await self._ensure_initialized()
+        
+        try:
+            # Build context for AI analysis
+            context = self._build_pulse_context(messages, metrics, timeframe, focus)
+            
+            # Generate AI insights based on focus
+            insights = await self._generate_pulse_insights(
+                context=context,
+                server_config=server_config,
+                style=style,
+                focus=focus
+            )
+            
+            # Add semantic analysis if available
+            if messages:
+                try:
+                    # Get trending topics for additional context
+                    trending_topics = await self.embedding_service.get_trending_topics(
+                        server_id=server_config.server_id,
+                        time_window_hours=self._parse_timeframe_hours(timeframe),
+                        limit=3
+                    )
+                    insights["trending_topics"] = trending_topics
+                except Exception as e:
+                    logger.warning(f"Failed to get trending topics: {e}")
+                    insights["trending_topics"] = []
+            
+            # Package results
+            analysis_result = {
+                "summary": insights.get("summary", "Community pulse analysis complete"),
+                "insights": insights.get("insights", "No specific insights available"),
+                "story": insights.get("story", "Your community story"),
+                "mood_analysis": insights.get("mood_analysis", "Mood analysis pending"),
+                "social_patterns": insights.get("social_patterns", []),
+                "recommendations": insights.get("recommendations", []),
+                "trending_topics": insights.get("trending_topics", []),
+                "style": style,
+                "focus": focus,
+                "timeframe": timeframe,
+                "generated_at": datetime.now().isoformat()
+            }
+            
+            logger.info(
+                "Community pulse analysis completed",
+                server_id=server_config.server_id,
+                timeframe=timeframe,
+                style=style,
+                focus=focus,
+                message_count=len(messages)
+            )
+            
+            return analysis_result
+        
+        except Exception as e:
+            logger.error(f"Community pulse generation failed: {e}")
+            return {
+                "summary": "Community pulse analysis encountered an error",
+                "insights": f"Analysis failed: {str(e)}",
+                "story": "The community story could not be generated at this time",
+                "error": str(e),
+                "generated_at": datetime.now().isoformat()
+            }
+    
+    def _build_pulse_context(self, messages: List[Message], metrics: Dict[str, Any], timeframe: str, focus: str) -> str:
+        """Build context string for AI analysis."""
+        # Extract key information for AI processing
+        message_samples = []
+        if messages:
+            # Get diverse message samples
+            sorted_messages = sorted(messages, key=lambda x: x.total_reactions + x.reply_count * 2, reverse=True)
+            top_messages = sorted_messages[:5]  # Top engaging messages
+            recent_messages = sorted(messages, key=lambda x: x.timestamp, reverse=True)[:3]  # Most recent
+            
+            for msg in top_messages + recent_messages:
+                if msg not in message_samples:
+                    message_samples.append(f"User {msg.author_id}: {msg.content[:100]}")
+        
+        context = f"""
+Community Pulse Analysis Context:
+Timeframe: {timeframe}
+Focus: {focus}
+Total Messages: {metrics['total_messages']}
+Active Users: {metrics['unique_users']}
+Engagement Rate: {metrics['engagement_rate']:.2f}
+Mood Score: {metrics['mood_score']:.0f}%
+Conversations: {metrics['conversation_chains']}
+
+Sample Messages:
+{chr(10).join(message_samples[:8])}
+
+Analysis Focus: {focus}
+"""
+        return context
+    
+    async def _generate_pulse_insights(
+        self,
+        context: str,
+        server_config: ServerConfig,
+        style: str,
+        focus: str
+    ) -> Dict[str, Any]:
+        """Generate AI insights for community pulse."""
+        try:
+            # Create prompt based on style and focus
+            prompt = self._create_pulse_prompt(context, server_config.persona, style, focus)
+            
+            # Generate insights using Groq
+            response = await self.groq_client.conversation_completion([
+                {"role": "system", "content": "You are a community analyst generating insights about Discord server social dynamics."},
+                {"role": "user", "content": prompt}
+            ], max_tokens=1500)
+            
+            # Parse response into structured insights
+            response_text = response.get("content", "Analysis not available")
+            
+            # Extract structured information from response
+            insights = self._parse_pulse_response(response_text, style, focus)
+            
+            return insights
+        
+        except Exception as e:
+            logger.error(f"AI insight generation failed: {e}")
+            return {
+                "summary": "Community pulse summary not available",
+                "insights": f"Insight generation failed: {str(e)}",
+                "story": "Community story generation failed"
+            }
+    
+    def _create_pulse_prompt(self, context: str, persona: PersonaType, style: str, focus: str) -> str:
+        """Create AI prompt for pulse analysis."""
+        persona_style = {
+            PersonaType.SASSY_REPORTER: "sassy and entertaining",
+            PersonaType.PROFESSIONAL_JOURNALIST: "professional and analytical",
+            PersonaType.GOSSIP_COLUMNIST: "gossipy and dramatic",
+            PersonaType.INVESTIGATIVE_REPORTER: "thorough and investigative",
+            PersonaType.SOCIAL_MEDIA_INFLUENCER: "trendy and engaging"
+        }.get(persona, "balanced and informative")
+        
+        style_instructions = {
+            "dashboard": "Create a structured, metric-focused analysis",
+            "story": "Write a narrative story about the community",
+            "weather": "Present as a weather-style report",
+            "gaming": "Use gaming terminology and stats",
+            "network": "Focus on social connections and patterns"
+        }.get(style, "Create a balanced analysis")
+        
+        focus_instructions = {
+            "overall": "Provide comprehensive community overview",
+            "social": "Focus on user relationships and interactions",
+            "topics": "Highlight trending topics and discussions",
+            "mood": "Analyze community mood and sentiment",
+            "activity": "Focus on activity patterns and engagement",
+            "patterns": "Identify hidden social patterns"
+        }.get(focus, "Provide general insights")
+        
+        return f"""
+Analyze this Discord community data with a {persona_style} tone:
+
+{context}
+
+Instructions:
+- {style_instructions}
+- {focus_instructions}
+- Keep insights engaging and actionable
+- Highlight positive community aspects
+- Identify interesting social patterns
+- Suggest ways to improve engagement
+
+Provide your analysis in this format:
+SUMMARY: [Brief 1-2 sentence overview]
+INSIGHTS: [Key insights and observations]
+STORY: [Narrative description if style is story]
+PATTERNS: [Social patterns discovered]
+RECOMMENDATIONS: [Actionable suggestions]
+"""
+    
+    def _parse_pulse_response(self, response_text: str, style: str, focus: str) -> Dict[str, Any]:
+        """Parse AI response into structured insights."""
+        insights = {
+            "summary": "Community analysis complete",
+            "insights": "Key insights generated",
+            "story": "Community story",
+            "patterns": [],
+            "recommendations": []
+        }
+        
+        try:
+            # Extract sections from response
+            lines = response_text.split('\n')
+            current_section = None
+            
+            for line in lines:
+                line = line.strip()
+                if line.startswith("SUMMARY:"):
+                    current_section = "summary"
+                    insights["summary"] = line.replace("SUMMARY:", "").strip()
+                elif line.startswith("INSIGHTS:"):
+                    current_section = "insights"
+                    insights["insights"] = line.replace("INSIGHTS:", "").strip()
+                elif line.startswith("STORY:"):
+                    current_section = "story"
+                    insights["story"] = line.replace("STORY:", "").strip()
+                elif line.startswith("PATTERNS:"):
+                    current_section = "patterns"
+                elif line.startswith("RECOMMENDATIONS:"):
+                    current_section = "recommendations"
+                elif line and current_section:
+                    # Append to current section
+                    if current_section in ["summary", "insights", "story"]:
+                        insights[current_section] += " " + line
+                    elif current_section in ["patterns", "recommendations"]:
+                        if line.startswith("-") or line.startswith("•"):
+                            insights[current_section].append(line[1:].strip())
+                        else:
+                            insights[current_section].append(line)
+        
+        except Exception as e:
+            logger.warning(f"Failed to parse pulse response: {e}")
+        
+        return insights
+    
+    def _parse_timeframe_hours(self, timeframe: str) -> int:
+        """Convert timeframe string to hours."""
+        timeframe_map = {
+            "1h": 1,
+            "6h": 6, 
+            "24h": 24,
+            "7d": 168,
+            "30d": 720
+        }
+        return timeframe_map.get(timeframe, 24)
+    
     async def cleanup_server_data(
         self,
         server_id: str,
@@ -419,6 +675,8 @@ class AIService:
         if not self._initialized:
             await self.initialize()
 
+    async def generate_leaks(self,target_users,target_messages):
+        pass
 
 # Global AI service instance
 _ai_service: Optional[AIService] = None

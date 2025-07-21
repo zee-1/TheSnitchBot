@@ -11,3 +11,4 @@ Can Never be skipped:
 - Always prefer Refactoring over Rewriting
 - Before saying all tasks are complete, test whatever you have made
 - Always prefer Test Driven Development
+- Always use git after making changes

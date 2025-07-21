@@ -89,6 +89,7 @@ class HelpCommand(PublicCommand):
                 "`/content breaking-news [count] [hours]` - Generate breaking news from recent activity (10-100 messages, 1-24 hours)",
                 "`/content fact-check [message_id]` - Fact-check a message with humorous verdict (or use right-click context menu)",
                 "`/content controversy-check [message_id]` - Analyze controversy level of a message (or use right-click context menu)",
+                "`/content community-pulse [timeframe] [style] [focus]` - Get real-time community insights and social dynamics",
                 "`/content submit-tip <content> [category] [anonymous]` - Submit anonymous tips for investigation with categories"
             ]
             
@@ -119,6 +120,7 @@ class HelpCommand(PublicCommand):
                 "🔍 **Fact-Checking** - Humorous fact-checking with context menu support",
                 "🕵️ **Tip System** - Anonymous submission, categorization, and management workflow",
                 "📈 **Content Analytics** - Smart categorization, trending topics, and engagement metrics",
+                "💫 **Community Pulse** - Real-time social insights with mood analysis and trending topics",
                 "🎯 **Context Menus** - Right-click messages for quick fact-check and controversy analysis"
             ]
             

@@ -14,6 +14,8 @@ from src.data.repositories.server_repository import ServerRepository
 from src.data.repositories.tip_repository import TipRepository
 from src.data.repositories.newsletter_repository import NewsletterRepository
 from src.data.repositories.message_repository import MessageRepository
+from src.data.repositories.user_preferences_repository import UserPreferencesRepository
+from src.ai.service import AIService
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +45,9 @@ class DependencyContainer:
             
             # Initialize repositories
             await self._initialize_repositories()
+            
+            # Initialize AI service
+            await self._initialize_ai_service()
             
             self._initialized = True
             logger.info("Dependency container initialized successfully")
@@ -80,7 +85,22 @@ class DependencyContainer:
             container_name=self._settings.cosmos_container_operational
         )
         
+        # User preferences repository - uses operational_data container
+        self._instances['user_preferences_repository'] = UserPreferencesRepository(
+            cosmos_client=self._cosmos_client,
+            container_name=self._settings.cosmos_container_operational
+        )
+        
         logger.info("All repositories initialized")
+    
+    async def _initialize_ai_service(self) -> None:
+        """Initialize AI service."""
+        # AI service initializes itself and manages its own dependencies
+        ai_service = AIService()
+        await ai_service.initialize()
+        
+        self._instances['ai_service'] = ai_service
+        logger.info("AI service initialized")
     
     async def close(self) -> None:
         """Close all connections and cleanup resources."""
@@ -119,6 +139,14 @@ class DependencyContainer:
     def get_message_repository(self) -> MessageRepository:
         """Get message repository."""
         return self._get_instance('message_repository', MessageRepository)
+    
+    def get_user_preferences_repository(self) -> UserPreferencesRepository:
+        """Get user preferences repository."""
+        return self._get_instance('user_preferences_repository', UserPreferencesRepository)
+    
+    def get_ai_service(self) -> AIService:
+        """Get AI service."""
+        return self._get_instance('ai_service', AIService)
     
     def _get_instance(self, key: str, expected_type: type) -> Any:
         """Get instance from container with type checking."""

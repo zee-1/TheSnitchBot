@@ -207,13 +207,13 @@ We need a *wide variety* of topics, so **DO NOT** give excessive weight to just 
 -   Obsessions with pop culture (e.g., binging a super cheesy show, stanning a niche artist, having a weird fan theory, being obsessed with a meme).
 -   Quirky personal habits or fashion choices (e.g., always wearing mismatched socks, having a secret love for Crocs, a questionable fashion "glow up" attempt).
 -   Silly Discord behaviors (e.g., accidentally muting themselves mid-rant, spamming ancient emojis, falling asleep on voice chat).
--   Hilarious social interactions with other server members (e.g., {target_name} trying to impress {other_active_members[0]} and failing spectacularly, a funny misunderstanding with {other_active_members[1]}).
+-   Hilarious social interactions with other server members (e.g., {target_name} trying to impress other_active_members[0] and failing spectacularly, a funny misunderstanding with other_active_members[1]).
 
 **SERVER CONTEXT (for personalization):**
 -   **Target:** {target_name}
 -   **Server Name:** {context_info['server_name']}
--   **Recent Activity Patterns (if available):** {', '.join(target_messages[-10:]) if target_messages else 'minimal activity'}
--   **Other Active Members (if available):** {', '.join(list(other_users.keys())[:10]) if other_users else 'none'}
+-   **Recent Activity Patterns (if available):** {', '.join(target_messages[-50:]) if target_messages else 'minimal activity'}
+-   **Other Active Members (if available):** {', '.join(list(other_users.keys())) if other_users else 'none'}
 
 Your final output should be a single, entertaining, and harmless gossip leak. Make it server-specific and personalized based on the context provided.
 
