@@ -44,11 +44,26 @@ try:
         msg2.author.id = 12346
         msg2.author.name = "TestUser2"
         msg2.author.display_name = "Test User 2"
-        msg2.content = "Another test message with sufficient length for analysis"
+        msg2.content = "Another test message with sufficient length for analysis and more content to meet requirements"
         msg2.channel = Mock()
         msg2.channel.id = 67891
         msg2.created_at = datetime.now()  # timezone-naive
         mock_messages.append(msg2)
+        
+        # Add multiple messages from same users to meet minimum activity threshold
+        for i in range(3):
+            for user_id, user_name in [(12345, "TestUser1"), (12346, "TestUser2")]:
+                msg = Mock()
+                msg.author = Mock()
+                msg.author.bot = False
+                msg.author.id = user_id
+                msg.author.name = user_name
+                msg.author.display_name = f"Test User {user_id}"
+                msg.content = f"Additional message {i} from {user_name} with sufficient length for analysis"
+                msg.channel = Mock()
+                msg.channel.id = 67890
+                msg.created_at = datetime.now(timezone.utc) if i % 2 else datetime.now()
+                mock_messages.append(msg)
         
         # Test candidate pool building (this was causing the original error)
         try:
@@ -72,6 +87,38 @@ try:
             
         except Exception as e:
             print(f"FAIL: Error in selection tracking: {e}")
+            return False
+        
+        # Test fallback behavior when all users are recently targeted
+        try:
+            # Create more mock candidates
+            for i in range(5):
+                msg = Mock()
+                msg.author = Mock()
+                msg.author.bot = False
+                msg.author.id = 20000 + i
+                msg.author.name = f"FallbackUser{i}"
+                msg.author.display_name = f"Fallback User {i}"
+                msg.content = f"This is fallback test message {i} with enough content for analysis"
+                msg.channel = Mock()
+                msg.channel.id = 80000 + i
+                msg.created_at = datetime.now(timezone.utc)
+                mock_messages.append(msg)
+            
+            # Mark all potential users as recently targeted
+            for i in range(5):
+                selector._track_selection(str(20000 + i), "test_server_fallback")
+            
+            # Test fallback selection
+            fallback_candidates = selector._build_candidate_pool(mock_messages, "99999")
+            if fallback_candidates:
+                fallback_result = selector._apply_fallback_selection(fallback_candidates, "test_server_fallback")
+                print(f"PASS: Fallback selection works: found {len(fallback_result)} fallback candidates")
+            else:
+                print("INFO: No candidates for fallback test")
+                
+        except Exception as e:
+            print(f"FAIL: Error in fallback selection: {e}")
             return False
         
         # Test statistics generation

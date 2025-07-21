@@ -19,12 +19,14 @@ class EnhancedUserSelector:
         min_recent_messages: int = 2,
         exclude_recent_targets: bool = True,
         min_message_length: int = 10,
-        max_users_to_consider: int = 50
+        max_users_to_consider: int = 50,
+        fallback_candidate_limit: int = 10
     ):
         self.min_recent_messages = min_recent_messages
         self.exclude_recent_targets = exclude_recent_targets
         self.min_message_length = min_message_length
         self.max_users_to_consider = max_users_to_consider
+        self.fallback_candidate_limit = fallback_candidate_limit
         self.recent_targets = {}  # Store recent targets per server
         self.logger = get_logger(__name__)
     
@@ -59,9 +61,10 @@ class EnhancedUserSelector:
             filtered_candidates = self._apply_selection_filters(candidates, server_id)
             
             if not filtered_candidates:
-                self.logger.warning("No candidates passed filtering")
-                # Fall back to original candidates if filters are too strict
-                filtered_candidates = candidates
+                self.logger.warning("No candidates passed filtering, applying fallback strategy")
+                # Fallback: If recently-targeted filter eliminated all users, 
+                # select any N users at random from all valid candidates
+                filtered_candidates = self._apply_fallback_selection(candidates, server_id)
             
             # Select random user
             selected_user = self._select_random_user(filtered_candidates)
@@ -201,6 +204,50 @@ class EnhancedUserSelector:
                 continue
         
         return filtered
+    
+    def _apply_fallback_selection(self, candidates: List[Dict[str, Any]], server_id: str) -> List[Dict[str, Any]]:
+        """Apply fallback selection when no candidates pass the recent-target filter."""
+        
+        fallback_candidates = []
+        
+        # Apply only essential filters, ignoring recent-target restriction
+        for candidate in candidates:
+            try:
+                user_id = candidate['user_id']
+                
+                # Apply only basic quality filters, skip recent-target filter
+                
+                # Filter: Ensure minimum activity level
+                activity_score = candidate['activity_score']
+                if activity_score < 0.05:  # Lower threshold for fallback
+                    continue
+                
+                # Filter: Ensure user has some content for analysis
+                if len(candidate['recent_messages']) < 1:
+                    continue
+                
+                # Filter: Skip users with extremely short messages only
+                if candidate['avg_message_length'] < 10:  # Lower threshold for fallback
+                    continue
+                
+                fallback_candidates.append(candidate)
+                
+            except Exception as e:
+                self.logger.warning(f"Error in fallback filtering for candidate: {e}")
+                continue
+        
+        if not fallback_candidates:
+            # If even fallback fails, return the top candidates by activity
+            self.logger.warning("Fallback filtering failed, using top active candidates")
+            fallback_candidates = candidates[:min(self.fallback_candidate_limit, len(candidates))]
+        
+        # Randomly shuffle and limit to configurable number for selection
+        import random
+        random.shuffle(fallback_candidates)
+        max_fallback_candidates = min(self.fallback_candidate_limit, len(fallback_candidates))
+        
+        self.logger.info(f"Fallback selection: {len(fallback_candidates)} candidates available, using top {max_fallback_candidates}")
+        return fallback_candidates[:max_fallback_candidates]
     
     def _select_random_user(self, candidates: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Select a user randomly from filtered candidates."""

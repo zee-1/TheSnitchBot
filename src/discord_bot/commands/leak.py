@@ -58,7 +58,8 @@ class LeakCommand(PublicCommand):
                 min_recent_messages=ctx.server_config.leak_min_user_activity,
                 exclude_recent_targets=ctx.server_config.leak_exclude_recent_targets_hours > 0,
                 min_message_length=10,
-                max_users_to_consider=ctx.server_config.leak_max_context_messages
+                max_users_to_consider=ctx.server_config.leak_max_context_messages,
+                fallback_candidate_limit=15  # Allow up to 15 random users in fallback
             )
             selected_user_info = await user_selector.select_random_user(
                 recent_messages=recent_messages,
