@@ -249,7 +249,7 @@ class LeakCommand(PublicCommand):
             prompt = f"""Create a humorous, harmless "leak" about {target_name} for a Discord server gossip bot.
 
 USER CONTEXT: {target_name} recently active in {context_info['server_name']}
-PERSONA: {ctx.server_config.persona.value}
+PERSONA: {ctx.server_config.persona}
 RECENT TOPICS: {', '.join(target_messages[-3:]) if target_messages else 'general chat'}
 
 Generate a single, entertaining leak (max 150 characters) that is:

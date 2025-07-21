@@ -15,6 +15,11 @@ logger = get_logger(__name__)
 class LeakWriter(BaseLeakChain):
     """Writes final leak content based on planned concept."""
     
+    async def process(self, *args, **kwargs) -> LeakContent:
+        """Process method required by BaseLeakChain interface."""
+        # Delegate to write_leak method
+        return await self.write_leak(*args, **kwargs)
+    
     async def write_leak(
         self,
         content_plan: ContentPlan,
@@ -105,7 +110,7 @@ CONTENT GUIDELINES:
 - Make it server-relevant and community-friendly
 - Use natural language and current slang where appropriate
 
-WRITING STYLE FOR {persona.value}:
+WRITING STYLE FOR {persona.value if hasattr(persona, 'value') else str(persona)}:
 {self._get_persona_style_guide(persona)}
 
 Write ONLY the leak content itself. Do not include explanations or metadata."""
@@ -127,8 +132,20 @@ Write ONLY the leak content itself. Do not include explanations or metadata."""
             self.logger.warning(f"AI content generation failed: {e}")
             return self._get_fallback_content_text(target_name, persona)
     
-    def _get_persona_style_guide(self, persona: PersonaType) -> str:
+    def _get_persona_style_guide(self, persona) -> str:
         """Get detailed style guide for each persona."""
+        
+        # Handle both enum and string cases
+        if hasattr(persona, 'value'):
+            persona_key = persona
+        else:
+            # Convert string to enum if needed
+            try:
+                from src.models.server import PersonaType
+                persona_key = PersonaType(str(persona))
+            except (ValueError, AttributeError):
+                # Fallback for unknown persona
+                return "Write in a neutral, friendly tone with light humor."
         
         style_guides = {
             PersonaType.SASSY_REPORTER: """
@@ -175,7 +192,7 @@ Current conditions suggest continued [embarrassing behavior]. 🌤️"
             """.strip()
         }
         
-        return style_guides.get(persona, "Write in a neutral, friendly tone with light humor.")
+        return style_guides.get(persona_key, "Write in a neutral, friendly tone with light humor.")
     
     def _clean_content(self, content: str, max_length: int) -> str:
         """Clean and validate generated content."""
@@ -305,8 +322,21 @@ maintaining community-friendly humor."""
         
         return reasoning
     
-    def _get_fallback_content_text(self, target_name: str, persona: PersonaType) -> str:
+    def _get_fallback_content_text(self, target_name: str, persona) -> str:
         """Generate fallback content when AI fails."""
+        
+        # Handle both enum and string cases
+        if hasattr(persona, 'value'):
+            persona_key = persona
+        else:
+            # Convert string to enum if needed
+            try:
+                from src.models.server import PersonaType
+                persona_key = PersonaType(str(persona))
+            except (ValueError, AttributeError):
+                # Use default persona for fallback
+                from src.models.server import PersonaType
+                persona_key = PersonaType.SASSY_REPORTER
         
         fallback_templates = {
             PersonaType.SASSY_REPORTER: [
@@ -335,14 +365,14 @@ maintaining community-friendly humor."""
             ]
         }
         
-        templates = fallback_templates.get(persona, [
+        templates = fallback_templates.get(persona_key, [
             f"Sources report {target_name} has been spotted having passionate discussions about their favorite comfort food combinations.",
             f"Anonymous tip confirms {target_name} maintains surprisingly strong opinions about proper coffee brewing methods."
         ])
         
         return random.choice(templates)
     
-    def _get_fallback_content(self, target_name: str, persona: PersonaType) -> LeakContent:
+    def _get_fallback_content(self, target_name: str, persona) -> LeakContent:
         """Generate complete fallback content when everything fails."""
         
         content_text = self._get_fallback_content_text(target_name, persona)

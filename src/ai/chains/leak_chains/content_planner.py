@@ -15,6 +15,11 @@ logger = get_logger(__name__)
 class ContentPlanner(BaseLeakChain):
     """Plans content concepts for leak generation based on context analysis."""
     
+    async def process(self, *args, **kwargs) -> ContentPlan:
+        """Process method required by BaseLeakChain interface."""
+        # Delegate to plan_content method
+        return await self.plan_content(*args, **kwargs)
+    
     async def plan_content(
         self,
         context_analysis: ContextAnalysis,
@@ -97,7 +102,7 @@ RELEVANCE FACTORS:
 - Meme: {context_analysis.relevance_factors.get('meme', 0.5):.2f}
 - Personality: {context_analysis.relevance_factors.get('personality', 0.5):.2f}
 
-PERSONA: {persona.value}
+PERSONA: {persona.value if hasattr(persona, 'value') else str(persona)}
 
 Generate 4 distinct leak concepts, each focused on different themes:
 

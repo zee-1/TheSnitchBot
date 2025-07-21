@@ -18,6 +18,11 @@ logger = get_logger(__name__)
 class ContextAnalyzer(BaseLeakChain):
     """Analyzes server and user context for leak generation."""
     
+    async def process(self, *args, **kwargs) -> ContextAnalysis:
+        """Process method required by BaseLeakChain interface."""
+        # Delegate to analyze_context method
+        return await self.analyze_context(*args, **kwargs)
+    
     async def analyze_context(
         self,
         target_user_id: str,
@@ -200,7 +205,7 @@ class ContextAnalyzer(BaseLeakChain):
         
         return {
             "culture_type": primary_culture,
-            "persona_alignment": persona.value,
+            "persona_alignment": persona.value if hasattr(persona, 'value') else str(persona),
             "activity_level": "high" if len(message_contents) > 15 else "moderate" if len(message_contents) > 5 else "low",
             "confidence": min(len(message_contents) / 20, 1.0)
         }
@@ -276,7 +281,7 @@ SERVER CONTEXT:
 - Active Topics: {', '.join(active_topics)}
 - Server Culture: {server_culture['culture_type']}
 - Activity Level: {server_culture['activity_level']}
-- Bot Persona: {persona.value}
+- Bot Persona: {persona.value if hasattr(persona, 'value') else str(persona)}
 
 Please provide relevance scores (0.0 to 1.0) for different content types:
 
@@ -353,7 +358,7 @@ Content Strategy: Focus on {top_relevance[0]}-related humor with server culture 
         return ContextAnalysis(
             user_communication_style={"style": "neutral", "confidence": 0.3},
             active_topics=["general chat"],
-            server_culture_assessment={"culture_type": "neutral", "persona_alignment": persona.value},
+            server_culture_assessment={"culture_type": "neutral", "persona_alignment": persona.value if hasattr(persona, 'value') else str(persona)},
             relevance_factors={"gaming": 0.5, "social": 0.6, "hobby": 0.4, "meme": 0.4, "personality": 0.7},
             user_interests=["general topics"],
             recent_interactions=[],
