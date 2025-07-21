@@ -8,6 +8,9 @@ from datetime import datetime
 from enum import Enum
 
 from src.models.base import BaseModel, CosmosDBEntity
+from src.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class PrivacyLevel(Enum):

@@ -459,13 +459,14 @@ Analysis Focus: {focus}
             prompt = self._create_pulse_prompt(context, server_config.persona, style, focus)
             
             # Generate insights using Groq
-            response = await self.groq_client.conversation_completion([
+            response_text = await self.groq_client.conversation_completion([
                 {"role": "system", "content": "You are a community analyst generating insights about Discord server social dynamics."},
                 {"role": "user", "content": prompt}
             ], max_tokens=1500)
             
-            # Parse response into structured insights
-            response_text = response.get("content", "Analysis not available")
+            # Response is already the text content from conversation_completion
+            if not response_text:
+                response_text = "Analysis not available"
             
             # Extract structured information from response
             insights = self._parse_pulse_response(response_text, style, focus)

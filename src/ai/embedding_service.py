@@ -297,7 +297,6 @@ class EmbeddingService:
                 # Convert string timestamp to float if needed
                 if isinstance(msg_timestamp, str):
                     try:
-                        from datetime import datetime
                         dt = datetime.fromisoformat(msg_timestamp.replace('Z', '+00:00'))
                         msg_timestamp = dt.timestamp()
                     except:
@@ -357,7 +356,6 @@ class EmbeddingService:
                 # Convert string timestamp to float if needed
                 if isinstance(timestamp, str):
                     try:
-                        from datetime import datetime
                         dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
                         timestamp = dt.timestamp()
                     except:
