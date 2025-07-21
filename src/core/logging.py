@@ -6,6 +6,8 @@ Provides structured logging with proper formatting and levels.
 import logging
 import logging.config
 import sys
+import io
+import codecs
 from typing import Dict, Any, Optional
 from datetime import datetime
 import json
@@ -13,6 +15,62 @@ import structlog
 from pathlib import Path
 
 from src.core.config import Settings
+
+
+class SafeStreamHandler(logging.StreamHandler):
+    """Custom StreamHandler that handles Unicode encoding errors gracefully."""
+    
+    def emit(self, record):
+        try:
+            msg = self.format(record)
+            stream = self.stream
+            
+            # Handle Unicode encoding issues on Windows
+            if hasattr(stream, 'encoding') and stream.encoding:
+                # Try to encode with the stream's encoding
+                try:
+                    msg.encode(stream.encoding)
+                except UnicodeEncodeError:
+                    # Replace problematic characters with safe alternatives
+                    msg = self._replace_unicode_chars(msg)
+            
+            stream.write(msg + self.terminator)
+            self.flush()
+        except Exception:
+            self.handleError(record)
+    
+    def _replace_unicode_chars(self, text: str) -> str:
+        """Replace Unicode characters that can't be encoded with safe alternatives."""
+        replacements = {
+            '🍵': '[TEA]',
+            '🤖': '[BOT]',
+            '💅': '[SPARKLE]',
+            '✨': '[STARS]',
+            '👀': '[EYES]',
+            '☕': '[COFFEE]',
+            '🔍': '[SEARCH]',
+            '📊': '[CHART]',
+            '📋': '[CLIPBOARD]',
+            '💋': '[KISS]',
+            '👑': '[CROWN]',
+            '🏆': '[TROPHY]',
+            '📣': '[MEGAPHONE]',
+            '🎯': '[TARGET]',
+            '💪': '[MUSCLE]',
+            '👁️': '[EYE]',
+            '🎭': '[MASKS]',
+            '🛸': '[UFO]',
+            '🌤️': '[PARTLY_CLOUDY]',
+            '📡': '[SATELLITE]',
+            '🌪️': '[TORNADO]'
+        }
+        
+        for unicode_char, replacement in replacements.items():
+            text = text.replace(unicode_char, replacement)
+        
+        # Replace any remaining high Unicode characters
+        text = text.encode('ascii', errors='replace').decode('ascii')
+        return text
 
 
 def setup_logging(settings: Settings) -> None:
@@ -41,7 +99,7 @@ def setup_logging(settings: Settings) -> None:
         },
         "handlers": {
             "console": {
-                "class": "logging.StreamHandler",
+                "()": "src.core.logging.SafeStreamHandler",
                 "level": settings.log_level,
                 "formatter": "standard",
                 "stream": sys.stdout
@@ -52,7 +110,8 @@ def setup_logging(settings: Settings) -> None:
                 "formatter": "detailed",
                 "filename": "logs/snitch_bot.log",
                 "maxBytes": 10485760,  # 10MB
-                "backupCount": 5
+                "backupCount": 5,
+                "encoding": "utf-8"
             },
             "error_file": {
                 "class": "logging.handlers.RotatingFileHandler",
@@ -60,7 +119,8 @@ def setup_logging(settings: Settings) -> None:
                 "formatter": "json",
                 "filename": "logs/errors.log",
                 "maxBytes": 10485760,  # 10MB
-                "backupCount": 10
+                "backupCount": 10,
+                "encoding": "utf-8"
             }
         },
         "loggers": {
