@@ -52,16 +52,16 @@ class Settings(BaseSettings):
     groq_endpoint:str = Field(...,env="GROQ_ENDPOINT")
     groq_api_key: str = Field(..., env="GROQ_API_KEY")
     groq_model_name: str = Field("mixtral-8x7b-32768", env="GROQ_MODEL_NAME")
-    
+    groq_model_thinking:str =Field("deepseek-r1-distill-llama-70b",env="GROQ_THINKING_MODEL")
     gemini_endpoint:str =Field(...,env="GEMINI_ENDPOINT")
     gemini_api_key: str =Field(...,env="GEMINI_API_KEY")
-    gemini_pro_model:str = Field("gemini-2.5-pro",env="GEMINI_PRO_MODEL")
-    gemini_flash_model:str = Field("gemini-2.0-flash",env="GEMINI_FLASH_MODEL")
+    gemini_pro_model:str = Field("gemini-1.5-pro-latest",env="GEMINI_PRO_MODEL")
+    gemini_flash_model:str = Field("gemini-1.5-flash-latest",env="GEMINI_FLASH_MODEL")
     
     mistral_endpoint:str = Field(...,env="MISTRAL_ENDPOINT")
     mistral_api_key:str= Field(...,env="MISTRAL_API_KEY")
-    mistral_large:str = Field("mistral-large-latest",env="MISTRAL_LARGE")
-    mistral_small:str = Field("mistral-small-latest",env="MISTRAL_SMALL")
+    mistral_large:str = Field("mistral-large-2411",env="MISTRAL_LARGE")
+    mistral_small:str = Field("mistral-small-2409",env="MISTRAL_SMALL")
 
     # ChromaDB Configuration
     chroma_host: str = Field("localhost", env="CHROMA_HOST")

@@ -48,7 +48,7 @@ class LLMClient:
                 "base_url": settings.groq_endpoint,
                 "api_key": settings.groq_api_key,
                 "models": {
-                    "thinking": "llama-3.3-70b-reasoning",  # Thinking model
+                    "thinking": settings.groq_model_thinking,  # Thinking model
                     "default": settings.groq_model_name
                 },
                 "headers": {
@@ -172,7 +172,7 @@ class LLMClient:
         elif response.status_code == 401:
             raise AIProviderError("groq", "Authentication failed")
         elif response.status_code == 404:
-            raise AIModelNotAvailableError(model)
+            raise AIModelNotAvailableError(f"Groq model '{model}' not found. Available models might have changed.")
         else:
             raise AIProviderError("groq", f"API error: {response.status_code}")
     
@@ -215,8 +215,16 @@ class LLMClient:
             raise AIQuotaExceededError("Gemini API rate limit exceeded")
         elif response.status_code == 401:
             raise AIProviderError("gemini", "Authentication failed")
+        elif response.status_code == 404:
+            raise AIModelNotAvailableError(f"Gemini model '{model}' not found or endpoint incorrect. Check model name and API endpoint.")
         else:
-            raise AIProviderError("gemini", f"API error: {response.status_code}")
+            error_text = ""
+            try:
+                error_data = response.json()
+                error_text = f": {error_data}"
+            except:
+                pass
+            raise AIProviderError("gemini", f"API error: {response.status_code}{error_text}")
     
     async def _make_mistral_request(
         self,
@@ -254,8 +262,16 @@ class LLMClient:
             raise AIQuotaExceededError("Mistral API rate limit exceeded")
         elif response.status_code == 401:
             raise AIProviderError("mistral", "Authentication failed")
+        elif response.status_code == 404:
+            raise AIModelNotAvailableError(f"Mistral model '{model}' not found or endpoint incorrect. Check model name and API endpoint.")
         else:
-            raise AIProviderError("mistral", f"API error: {response.status_code}")
+            error_text = ""
+            try:
+                error_data = response.json()
+                error_text = f": {error_data}"
+            except:
+                pass
+            raise AIProviderError("mistral", f"API error: {response.status_code}{error_text}")
     
     def _convert_to_gemini_format(self, messages: List[Dict[str, str]]) -> List[Dict[str, Any]]:
         """Convert OpenAI format messages to Gemini format."""
@@ -350,7 +366,17 @@ class LLMClient:
                 selected_model = model
             elif provider:
                 selected_provider = provider
-                selected_model = self.providers[provider]["models"]["default"]
+                # Pick an appropriate default model for each provider
+                provider_models = self.providers[provider]["models"]
+                if provider == LLMProvider.GROQ:
+                    selected_model = provider_models.get("default", provider_models.get("thinking"))
+                elif provider == LLMProvider.GEMINI:
+                    selected_model = provider_models.get("flash", provider_models.get("pro"))
+                elif provider == LLMProvider.MISTRAL:
+                    selected_model = provider_models.get("small", provider_models.get("large"))
+                else:
+                    # Fallback: use the first available model
+                    selected_model = list(provider_models.values())[0]
             else:
                 selected_provider, model_key = self._get_provider_for_task(task_type)
                 selected_model = model or self.providers[selected_provider]["models"][model_key]
@@ -457,8 +483,49 @@ class LLMClient:
             except Exception as log_error:
                 logger.warning(f"Failed to log LLM error: {log_error}")
             
-            # Try fallback provider for final tasks
-            if task_type == TaskType.FINAL and 'selected_provider' in locals() and selected_provider == LLMProvider.GEMINI:
+            # Try fallback providers based on error type and task
+            fallback_attempted = False
+            
+            # For 404/model errors, try Groq as ultimate fallback
+            if "not found" in str(e).lower() or "404" in str(e) or isinstance(e, AIModelNotAvailableError):
+                logger.warning(f"Model not available error, falling back to Groq: {e}")
+                try:
+                    fallback_model = self.providers[LLMProvider.GROQ]["models"]["default"]
+                    fallback_result = await self._make_groq_request(
+                        messages, fallback_model, temperature, max_tokens, **kwargs
+                    )
+                    fallback_attempted = True
+                    
+                    # Log successful fallback
+                    try:
+                        duration_ms = (datetime.now() - start_time).total_seconds() * 1000
+                        response_content = fallback_result["choices"][0].get("message", {}).get("content", "") if fallback_result.get("choices") else ""
+                        
+                        await log_chain_step(
+                            chain_step="llm_completion_model_fallback",
+                            provider="groq",
+                            model=fallback_model,
+                            task_type=task_type.value,
+                            prompt=prompt_text if 'prompt_text' in locals() else "",
+                            response=response_content,
+                            duration_ms=duration_ms,
+                            usage_stats=fallback_result.get("usage", {}),
+                            server_id=server_id,
+                            user_id=user_id,
+                            command=command,
+                            metadata={"fallback_from": selected_provider.value if 'selected_provider' in locals() else "unknown", "original_error": str(e)}
+                        )
+                    except Exception as log_error:
+                        logger.warning(f"Failed to log model fallback completion: {log_error}")
+                    
+                    return fallback_result
+                    
+                except Exception as fallback_error:
+                    logger.error(f"Groq fallback also failed: {fallback_error}")
+                    # Continue to original fallback logic below
+            
+            # Original fallback logic for final tasks
+            if not fallback_attempted and task_type == TaskType.FINAL and 'selected_provider' in locals() and selected_provider == LLMProvider.GEMINI:
                 logger.warning(f"Gemini failed for final task, falling back to Mistral: {e}")
                 try:
                     fallback_result = await self._make_mistral_request(
@@ -708,6 +775,47 @@ class LLMClient:
                 results[provider.value] = False
         
         return results
+    
+    def validate_configuration(self) -> Dict[str, Any]:
+        """Validate API configuration and provide diagnostics."""
+        diagnostics = {}
+        
+        for provider, config in self.providers.items():
+            provider_diag = {
+                "provider": provider.value,
+                "has_api_key": bool(config.get("api_key")),
+                "has_base_url": bool(config.get("base_url")),
+                "models": list(config.get("models", {}).keys()),
+                "issues": []
+            }
+            
+            # Check for common configuration issues
+            if not config.get("api_key"):
+                provider_diag["issues"].append("Missing API key")
+            
+            if not config.get("base_url"):
+                provider_diag["issues"].append("Missing base URL")
+            
+            # Provider-specific checks
+            if provider == LLMProvider.GEMINI:
+                if "gemini-" not in str(config.get("models", {}).get("pro", "")):
+                    provider_diag["issues"].append("Pro model name doesn't contain 'gemini-'")
+                if "gemini-" not in str(config.get("models", {}).get("flash", "")):
+                    provider_diag["issues"].append("Flash model name doesn't contain 'gemini-'")
+                if "generativelanguage.googleapis.com" not in config.get("base_url", ""):
+                    provider_diag["issues"].append("Base URL doesn't look like official Gemini API endpoint")
+            
+            elif provider == LLMProvider.MISTRAL:
+                if "api.mistral.ai" not in config.get("base_url", ""):
+                    provider_diag["issues"].append("Base URL doesn't look like official Mistral API endpoint")
+            
+            elif provider == LLMProvider.GROQ:
+                if "api.groq.com" not in config.get("base_url", ""):
+                    provider_diag["issues"].append("Base URL doesn't look like official Groq API endpoint")
+            
+            diagnostics[provider.value] = provider_diag
+        
+        return diagnostics
     
     def get_usage_stats(self) -> Dict[str, Any]:
         """Get usage statistics for all providers."""
