@@ -5,7 +5,7 @@ Provides common functionality for newsletter generation chains.
 
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
-from src.ai.llm_client import LLMClient, TaskType
+from src.ai.llm_client import LLMClient, TaskType, LLMProvider
 from src.core.logging import get_logger
 
 
@@ -58,7 +58,26 @@ class BaseNewsletterChain(ABC):
             )
             return response
         except Exception as e:
-            self.logger.error(f"AI chat completion failed: {e}")
-            if fallback_response:
-                return fallback_response
-            raise
+            self.logger.warning(f"AI chat completion failed: {e}. Falling Back to Gemini Flash")
+            try:
+                response = await self.llm_client.chat_completion(
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    task_type=self.task_type,  # Use the chain's task type,
+                    provider=LLMProvider.GEMINI,
+                    
+
+                )
+                return response
+            except Exception as e2:
+                self.logger.warning(f"AI Chat Completion with Groq and Gemini Failed {e2}. Falling back to Mistral Small")
+                response = await self.llm_client.chat_completion(
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    task_type=self.task_type,  # Use the chain's task type,
+                    provider=LLMProvider.MISTRAL,
+                )        
+        
+        

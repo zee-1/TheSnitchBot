@@ -664,8 +664,8 @@ class SnitchBot(commands.Bot):
                             server_id=config.server_id,
                             newsletter_date=current_time.date(),
                             title=f"Failed Newsletter - {current_time.strftime('%B %d, %Y')}",
-                            time_period_start=current_time - timedelta(hours=24),
-                            time_period_end=current_time,
+                            time_period_start=(current_time - timedelta(hours=24)).strftime(r"%Y-%m-%d"),
+                            time_period_end=current_time.strftime(r"%Y-%m-%d"),
                             analyzed_messages_count=0,
                             persona_used=config.persona
                         )

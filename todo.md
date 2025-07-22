@@ -274,6 +274,49 @@ The Silent Supporters: @User7 never posts but reacts to show they're listening
 
 ---
 
+## **Technical Debt & Infrastructure Improvements** 🔧
+
+### **StandardLLMResponse Implementation** ⚠️ **DEFERRED**
+**Priority**: Medium-High | **Risk**: High | **Impact**: 25 files
+
+**Problem**: Current LLM response handling assumes `response_data["choices"][0]["message"]["content"]` across all chains, which could break with different providers or response formats.
+
+**Proposed Solution**:
+- Create `StandardLLMResponse` Pydantic model
+- Provider-specific parsers (Groq, Gemini, Mistral) 
+- Unified response interface across all AI chains
+
+**Files Affected** (25 total):
+- **Core Infrastructure**: `llm_client.py`, `groq_client.py`, `service.py`, `pipeline.py`
+- **Base Classes**: `base_newsletter_chain.py`, `leak_chains/base.py`  
+- **Chain Implementations**: All 6 chain files
+- **Discord Commands**: 4 command files
+- **Data Layer**: `message_repository.py`, `embedding_service.py`
+
+**Decision**: **POSTPONED** due to high risk vs current system stability
+
+**Alternative - Defensive Programming** (✅ **APPROVED**):
+```python
+# Immediate implementation - low risk, high value
+def safe_extract_content(response_data: Dict) -> str:
+    try:
+        return response_data["choices"][0]["message"]["content"]
+    except (KeyError, IndexError, TypeError) as e:
+        raise AIResponseError(f"Invalid response format: {e}")
+```
+
+**Action Items**:
+- [ ] Implement defensive response validation wrapper (Week 1)
+- [ ] Add logging to catch format inconsistencies (Week 1) 
+- [ ] Plan full StandardLLMResponse refactor for next major release (Month 3+)
+- [ ] Gradual chain migration over multiple sprints (Month 2-3)
+
+**Timeline**: 
+- **Immediate**: Defensive wrapper implementation
+- **Long-term**: Full refactor planned for Q2 major release cycle
+
+---
+
 **Status**: Planning Phase Complete ✅  
 **Next Action**: Begin Phase 1 Implementation  
 **Owner**: Development Team  

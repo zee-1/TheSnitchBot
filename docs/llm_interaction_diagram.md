@@ -1,13 +1,13 @@
-
 # LLM Interaction Flow
 
-This diagram illustrates the high-level interaction between different services and the Large Language Model (LLM) to generate content. It shows how user commands or scheduled tasks trigger a Chain of Thoughts (CoT) and Retrieval-Augmented Generation (RAG) pipeline.
+This diagram illustrates the high-level interaction between different services and the Large Language Model (LLM) to generate content. It shows how user commands or scheduled tasks trigger different Chain of Thoughts (CoT) and Retrieval-Augmented Generation (RAG) pipelines.
 
 ```mermaid
 graph TD
     subgraph User Input
         direction LR
-        UserInput[Discord Command e.g., /leak]
+        LeakInput[Discord Command /leak]
+        BreakingNewsInput[Discord Command /breaking-news]
         ScheduledTask[Scheduled Task e.g., Newsletter]
     end
 
@@ -15,6 +15,7 @@ graph TD
         direction RL
         ChromaDB[ChromaDB Vector Store]
         CosmosDB[Cosmos DB e.g., Server Persona]
+        DiscordChannel[Discord Channel History]
     end
 
     subgraph AI Orchestration Layer
@@ -24,6 +25,11 @@ graph TD
         subgraph "Chain of Thoughts (CoT) for /leak command"
             direction TB
             LeakChain1[1. Context Analyzer Chain] --> LeakChain2[2. Content Planner Chain] --> LeakChain3[3. Leak Writer Chain]
+        end
+
+        subgraph "Simplified RAG/CoT for /breaking-news"
+            direction TB
+            BreakingNewsChain[1. Single-Shot Analyze & Write Chain]
         end
 
         subgraph "RAG/CoT Pipeline for Newsletter"
@@ -41,13 +47,16 @@ graph TD
     end
 
     %% Connections
-    UserInput --> AIService
+    LeakInput --> AIService
+    BreakingNewsInput --> AIService
     ScheduledTask --> AIService
 
-    AIService --> ChromaDB
-    AIService --> CosmosDB
+    AIService -- "Retrieves recent messages" --> DiscordChannel
+    AIService -- "Retrieves embeddings" --> ChromaDB
+    AIService -- "Retrieves config" --> CosmosDB
 
     AIService --"Initiates /leak flow"--> LeakChain1
+    AIService --"Initiates /breaking-news flow"--> BreakingNewsChain
     AIService --"Initiates Newsletter flow"--> NewsChain1
 
     LeakChain1 --"Analyzed Context"--> LeakChain2
@@ -59,6 +68,8 @@ graph TD
     LeakChain1 --> GroqAPI
     LeakChain2 --> GroqAPI
     LeakChain3 --> GroqAPI
+
+    BreakingNewsChain --> GroqAPI
     
     NewsChain1 --> GroqAPI
     NewsChain2 --> GroqAPI
@@ -68,11 +79,14 @@ graph TD
     GroqAPI --"LLM Response"--> LeakChain2
     GroqAPI --"LLM Response"--> LeakChain3
 
+    GroqAPI --"LLM Response"--> BreakingNewsChain
+
     GroqAPI --"LLM Response"--> NewsChain1
     GroqAPI --"LLM Response"--> NewsChain2
     GroqAPI --"LLM Response"--> NewsChain3
 
     LeakChain3 --"Final Content"--> DiscordResponse
+    BreakingNewsChain --"Final Content"--> DiscordResponse
     NewsChain3 --"Final Newsletter"--> DiscordResponse
     
     %% Styling
@@ -83,10 +97,10 @@ graph TD
     classDef external fill:#EAECEE,stroke:#95A5A6,stroke-width:2px;
     classDef output fill:#E8DAEF,stroke:#8E44AD,stroke-width:2px;
 
-    class UserInput,ScheduledTask userInput;
+    class LeakInput,BreakingNewsInput,ScheduledTask userInput;
     class AIService service;
-    class LeakChain1,LeakChain2,LeakChain3,NewsChain1,NewsChain2,NewsChain3 chain;
-    class ChromaDB,CosmosDB data;
+    class LeakChain1,LeakChain2,LeakChain3,NewsChain1,NewsChain2,NewsChain3,BreakingNewsChain chain;
+    class ChromaDB,CosmosDB,DiscordChannel data;
     class GroqAPI external;
     class DiscordResponse output;
 ```
