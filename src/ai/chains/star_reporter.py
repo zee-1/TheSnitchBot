@@ -7,7 +7,7 @@ from typing import List, Dict, Any, Optional
 import logging
 from datetime import datetime
 
-from src.ai.groq_client import GroqClient
+from src.ai.llm_client import LLMClient
 from src.ai.prompts.newsletter import NewsletterPrompts
 from src.models.message import Message
 from src.models.server import PersonaType
@@ -20,8 +20,8 @@ logger = get_logger(__name__)
 class StarReporterChain:
     """Chain C: Writes the final newsletter article."""
     
-    def __init__(self, groq_client: GroqClient):
-        self.groq_client = groq_client
+    def __init__(self, llm_client: LLMClient):
+        self.llm_client = llm_client
     
     async def write_article(
         self,
@@ -75,7 +75,7 @@ class StarReporterChain:
             """
             
             # Generate the article
-            article = await self.groq_client.conversation_completion(
+            article = await self.llm_client.conversation_completion(
                 conversation=[{"role": "user", "content": writing_prompt}],
                 system_prompt=system_prompt,
                 temperature=0.8,  # Higher temperature for creative writing
@@ -282,7 +282,7 @@ class StarReporterChain:
             
             Context: {context or "Recent channel activity"}
             
-            Write a 2-3 sentence breaking news bulletin that:
+            Write a 5-10 sentence breaking news bulletin that:
             - Starts with "🚨 BREAKING:" or similar
             - Summarizes the most significant recent event/topic
             - Uses your {persona.replace('_', ' ')} voice
@@ -292,7 +292,7 @@ class StarReporterChain:
             Write only the bulletin, nothing else:
             """
             
-            bulletin = await self.groq_client.conversation_completion(
+            bulletin = await self.llm_client.conversation_completion(
                 conversation=[{"role": "user", "content": breaking_prompt}],
                 system_prompt=system_prompt,
                 temperature=0.8,

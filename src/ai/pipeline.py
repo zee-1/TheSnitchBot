@@ -4,10 +4,10 @@ Coordinates the full RAG/CoT newsletter generation process.
 """
 
 from typing import List, Dict, Any, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 
-from src.ai.groq_client import GroqClient
+from src.ai.llm_client import LLMClient
 from src.ai.chains.news_desk import NewsDeskChain
 from src.ai.chains.editor_chief import EditorChiefChain
 from src.ai.chains.star_reporter import StarReporterChain
@@ -23,13 +23,13 @@ logger = get_logger(__name__)
 class NewsletterPipeline:
     """Complete AI pipeline for newsletter generation using RAG and CoT approach."""
     
-    def __init__(self, groq_client: GroqClient):
-        self.groq_client = groq_client
+    def __init__(self, llm_client: LLMClient):
+        self.llm_client = llm_client
         
         # Initialize the three chains
-        self.news_desk = NewsDeskChain(groq_client)
-        self.editor_chief = EditorChiefChain(groq_client)
-        self.star_reporter = StarReporterChain(groq_client)
+        self.news_desk = NewsDeskChain(llm_client)
+        self.editor_chief = EditorChiefChain(llm_client)
+        self.star_reporter = StarReporterChain(llm_client)
     
     @log_performance("newsletter_generation")
     async def generate_newsletter(
@@ -236,7 +236,7 @@ class NewsletterPipeline:
             
             for analysis_type in analysis_types:
                 try:
-                    result = await self.groq_client.analyze_content(
+                    result = await self.llm_client.analyze_content(
                         content=content,
                         analysis_type=analysis_type,
                         context=context
@@ -287,7 +287,15 @@ class NewsletterPipeline:
         
         # Sort by relevance (engagement + controversy + recency)
         def relevance_score(msg: Message) -> float:
-            recency_hours = (datetime.now() - msg.timestamp_dt).total_seconds() / 3600
+            # Ensure both datetimes are timezone-aware for comparison
+            now = datetime.now(timezone.utc)
+            msg_time = msg.timestamp_dt
+            
+            # If msg.timestamp_dt is naive, make it aware
+            if msg_time.tzinfo is None:
+                msg_time = msg_time.replace(tzinfo=timezone.utc)
+            
+            recency_hours = (now - msg_time).total_seconds() / 3600
             recency_factor = max(0, 1 - (recency_hours / 24))  # Decay over 24 hours
             
             return (
@@ -397,15 +405,15 @@ class NewsletterPipeline:
 _newsletter_pipeline: Optional[NewsletterPipeline] = None
 
 
-async def get_newsletter_pipeline(groq_client: Optional[GroqClient] = None) -> NewsletterPipeline:
+async def get_newsletter_pipeline(llm_client: Optional[LLMClient] = None) -> NewsletterPipeline:
     """Get or create the global newsletter pipeline."""
     global _newsletter_pipeline
     
     if _newsletter_pipeline is None:
-        if groq_client is None:
-            from src.ai.groq_client import get_groq_client
-            groq_client = await get_groq_client()
+        if llm_client is None:
+            from src.ai.llm_client import get_llm_client
+            llm_client = await get_llm_client()
         
-        _newsletter_pipeline = NewsletterPipeline(groq_client)
+        _newsletter_pipeline = NewsletterPipeline(llm_client)
     
     return _newsletter_pipeline

@@ -175,7 +175,7 @@ class FactCheckCommand(PublicCommand):
                         except Exception as e:
                             logger.warning(f"Failed to fetch server config for persona: {e}")
                     
-                    analysis = await ai_service.groq_client.analyze_content(
+                    analysis = await ai_service.llm_client.analyze_content(
                         content=target_message.content,
                         analysis_type="fact_check",
                         context=f"Discord message fact-check with {persona_name} persona"

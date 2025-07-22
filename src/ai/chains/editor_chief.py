@@ -6,7 +6,7 @@ Selects the best story from candidates identified by News Desk.
 from typing import List, Dict, Any, Optional
 import logging
 
-from src.ai.groq_client import GroqClient
+from src.ai.llm_client import LLMClient
 from src.ai.prompts.newsletter import NewsletterPrompts
 from src.models.server import PersonaType
 from src.core.exceptions import AIServiceError
@@ -18,8 +18,8 @@ logger = get_logger(__name__)
 class EditorChiefChain:
     """Chain B: Selects the best story for the newsletter headline."""
     
-    def __init__(self, groq_client: GroqClient):
-        self.groq_client = groq_client
+    def __init__(self, llm_client: LLMClient):
+        self.llm_client = llm_client
     
     async def select_headline(
         self,
@@ -70,7 +70,7 @@ class EditorChiefChain:
             """
             
             # Get AI editorial decision
-            response = await self.groq_client.conversation_completion(
+            response = await self.llm_client.conversation_completion(
                 conversation=[{"role": "user", "content": editorial_prompt}],
                 system_prompt=system_prompt,
                 temperature=0.6,  # Slightly lower temperature for editorial decisions
@@ -158,7 +158,7 @@ class EditorChiefChain:
             4. Any concerns or adjustments needed
             """
             
-            response = await self.groq_client.conversation_completion(
+            response = await self.llm_client.conversation_completion(
                 conversation=[{"role": "user", "content": review_prompt}],
                 system_prompt=system_prompt,
                 temperature=0.6,

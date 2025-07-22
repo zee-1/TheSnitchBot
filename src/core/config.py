@@ -49,9 +49,20 @@ class Settings(BaseSettings):
     key_vault_url: str = Field(..., env="KEY_VAULT_URL")
     
     # AI Services
+    groq_endpoint:str = Field(...,env="GROQ_ENDPOINT")
     groq_api_key: str = Field(..., env="GROQ_API_KEY")
     groq_model_name: str = Field("mixtral-8x7b-32768", env="GROQ_MODEL_NAME")
     
+    gemini_endpoint:str =Field(...,env="GEMINI_ENDPOINT")
+    gemini_api_key: str =Field(...,env="GEMINI_API_KEY")
+    gemini_pro_model:str = Field("gemini-2.5-pro",env="GEMINI_PRO_MODEL")
+    gemini_flash_model:str = Field("gemini-2.0-flash",env="GEMINI_FLASH_MODEL")
+    
+    mistral_endpoint:str = Field(...,env="MISTRAL_ENDPOINT")
+    mistral_api_key:str= Field(...,env="MISTRAL_API_KEY")
+    mistral_large:str = Field("mistral-large-latest",env="MISTRAL_LARGE")
+    mistral_small:str = Field("mistral-small-latest",env="MISTRAL_SMALL")
+
     # ChromaDB Configuration
     chroma_host: str = Field("localhost", env="CHROMA_HOST")
     chroma_port: int = Field(8000, env="CHROMA_PORT")
@@ -139,6 +150,7 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         case_sensitive=False,
         validate_assignment=True,
+        extra="ignore",  # Ignore extra environment variables
         # Note: secrets handling in Pydantic v2 is done differently
     )
 

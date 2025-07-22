@@ -5,7 +5,7 @@ Base classes for leak command Chain of Thoughts implementation.
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
-from src.ai.groq_client import GroqClient
+from src.ai.llm_client import LLMClient
 from src.core.logging import get_logger
 logger = get_logger(__name__)
 
@@ -57,8 +57,8 @@ class LeakContent:
 class BaseLeakChain(ABC):
     """Base class for leak command CoT chains."""
     
-    def __init__(self, groq_client: GroqClient):
-        self.groq_client = groq_client
+    def __init__(self, llm_client: LLMClient):
+        self.llm_client = llm_client
         self.logger = get_logger(self.__class__.__name__)
     
     @abstractmethod
@@ -75,7 +75,7 @@ class BaseLeakChain(ABC):
     ) -> str:
         """Safely get AI completion with error handling."""
         try:
-            response = await self.groq_client.simple_completion(
+            response = await self.llm_client.simple_completion(
                 prompt=prompt,
                 temperature=temperature,
                 max_tokens=max_tokens

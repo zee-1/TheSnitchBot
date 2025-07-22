@@ -203,7 +203,7 @@ class LeakCommand(PublicCommand):
             
             # Step 1: Context Analysis
             logger.info("CoT Step 1: Analyzing context")
-            context_analyzer = ContextAnalyzer(ai_service.groq_client)
+            context_analyzer = ContextAnalyzer(ai_service.llm_client)
             context_analysis = await context_analyzer.analyze_context(
                 target_user_id=target_user_id,
                 target_name=target_name,
@@ -213,7 +213,7 @@ class LeakCommand(PublicCommand):
             
             # Step 2: Content Planning
             logger.info("CoT Step 2: Planning content")
-            content_planner = ContentPlanner(ai_service.groq_client)
+            content_planner = ContentPlanner(ai_service.llm_client)
             content_plan = await content_planner.plan_content(
                 context_analysis=context_analysis,
                 persona=persona,
@@ -222,7 +222,7 @@ class LeakCommand(PublicCommand):
             
             # Step 3: Final Content Writing
             logger.info("CoT Step 3: Writing final content")
-            leak_writer = LeakWriter(ai_service.groq_client)
+            leak_writer = LeakWriter(ai_service.llm_client)
             final_content = await leak_writer.write_leak(
                 content_plan=content_plan,
                 persona=persona,
@@ -283,7 +283,7 @@ Generate a single, entertaining leak (max 150 characters) that is:
 
 Just return the leak content, nothing else."""
             
-            leak_content = await ai_service.groq_client.simple_completion(
+            leak_content = await ai_service.llm_client.simple_completion(
                 prompt=prompt,
                 temperature=0.9,
                 max_tokens=200

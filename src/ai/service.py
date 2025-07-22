@@ -7,7 +7,7 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 import logging
 
-from src.ai.groq_client import GroqClient, get_groq_client
+from src.ai.llm_client import LLMClient, get_llm_client
 from src.ai.pipeline import NewsletterPipeline, get_newsletter_pipeline
 from src.ai.embedding_service import EmbeddingService, get_embedding_service
 from src.models.message import Message
@@ -31,7 +31,7 @@ class AIService:
     """
     
     def __init__(self):
-        self.groq_client: Optional[GroqClient] = None
+        self.llm_client: Optional[LLMClient] = None
         self.newsletter_pipeline: Optional[NewsletterPipeline] = None
         self.embedding_service: Optional[EmbeddingService] = None
         self._initialized = False
@@ -43,8 +43,8 @@ class AIService:
         
         try:
             # Initialize core services
-            self.groq_client = await get_groq_client()
-            self.newsletter_pipeline = await get_newsletter_pipeline(self.groq_client)
+            self.llm_client = await get_llm_client()
+            self.newsletter_pipeline = await get_newsletter_pipeline(self.llm_client)
             self.embedding_service = await get_embedding_service()
             
             self._initialized = True
@@ -151,7 +151,7 @@ class AIService:
                 content_to_analyze += f"\n\nContext: {' | '.join(context_snippets)}"
             
             # Use Groq client for controversy analysis
-            analysis = await self.groq_client.analyze_content(
+            analysis = await self.llm_client.analyze_content(
                 content=content_to_analyze,
                 analysis_type="controversy",
                 context="Discord server message analysis"
@@ -459,7 +459,7 @@ Analysis Focus: {focus}
             prompt = self._create_pulse_prompt(context, server_config.persona, style, focus)
             
             # Generate insights using Groq
-            response_text = await self.groq_client.conversation_completion([
+            response_text = await self.llm_client.conversation_completion([
                 {"role": "system", "content": "You are a community analyst generating insights about Discord server social dynamics."},
                 {"role": "user", "content": prompt}
             ], max_tokens=1500)
@@ -632,7 +632,7 @@ RECOMMENDATIONS: [Actionable suggestions]
         """Check the health of all AI services."""
         health_status = {
             "ai_service": "unknown",
-            "groq_client": "unknown",
+            "llm_client": "unknown",
             "newsletter_pipeline": "unknown",
             "embedding_service": "unknown",
             "timestamp": datetime.now().isoformat()
@@ -643,15 +643,15 @@ RECOMMENDATIONS: [Actionable suggestions]
             health_status["ai_service"] = "healthy"
             
             # Check Groq client
-            if self.groq_client:
+            if self.llm_client:
                 try:
                     # Simple test request
-                    await self.groq_client.conversation_completion([
+                    await self.llm_client.conversation_completion([
                         {"role": "user", "content": "Test"}
                     ], max_tokens=5)
-                    health_status["groq_client"] = "healthy"
+                    health_status["llm_client"] = "healthy"
                 except:
-                    health_status["groq_client"] = "unhealthy"
+                    health_status["llm_client"] = "unhealthy"
             
             # Check newsletter pipeline
             if self.newsletter_pipeline:

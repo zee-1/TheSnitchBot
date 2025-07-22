@@ -7,7 +7,7 @@ from typing import List, Dict, Any, Optional
 import json
 import logging
 
-from src.ai.groq_client import GroqClient
+from src.ai.llm_client import LLMClient
 from src.ai.prompts.newsletter import NewsletterPrompts
 from src.models.message import Message
 from src.models.server import PersonaType
@@ -20,8 +20,8 @@ logger = get_logger(__name__)
 class NewsDeskChain:
     """Chain A: Identifies newsworthy stories from messages."""
     
-    def __init__(self, groq_client: GroqClient):
-        self.groq_client = groq_client
+    def __init__(self, llm_client: LLMClient):
+        self.llm_client = llm_client
     
     async def identify_stories(
         self,
@@ -69,7 +69,7 @@ class NewsDeskChain:
             """
             
             # Get AI response
-            response = await self.groq_client.conversation_completion(
+            response = await self.llm_client.conversation_completion(
                 conversation=[{"role": "user", "content": analysis_prompt}],
                 system_prompt=system_prompt,
                 temperature=0.7,

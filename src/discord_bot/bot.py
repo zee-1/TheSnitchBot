@@ -574,62 +574,125 @@ class SnitchBot(commands.Bot):
                 config.server_id, today_date
             )
             
-            return existing_newsletter is None
+            # No newsletter exists for today - generate one
+            if existing_newsletter is None:
+                return True
+            
+            # Check if existing newsletter failed and can be retried
+            if hasattr(existing_newsletter, 'status') and existing_newsletter.status == "failed":
+                # Check if enough time has passed since last failure (retry every 2 hours)
+                if hasattr(existing_newsletter, 'updated_at'):
+                    time_since_failure = current_time - existing_newsletter.updated_at
+                    if time_since_failure.total_seconds() >= 7200:  # 2 hours
+                        logger.info(f"Retrying failed newsletter for server {config.server_id}")
+                        return True
+            
+            return False
             
         except Exception as e:
             logger.error(f"Error checking newsletter schedule: {e}")
             return False
     
     async def _generate_and_send_newsletter(self, config: ServerConfig):
-        """Generate and send a newsletter for a server."""
-        try:
-            logger.info(f"Generating newsletter for server {config.server_id}")
-            
-            # Get recent messages
-            message_repo = self.container.get_message_repository()
-            cutoff_time = datetime.now() - timedelta(hours=24)
-            
-            recent_messages = await message_repo.get_by_server_and_time_range(
-                config.server_id, cutoff_time, datetime.now()
-            )
-            
-            if len(recent_messages) < 5:
-                logger.info(f"Insufficient messages for newsletter in server {config.server_id}")
-                return
-            
-            # Create newsletter object with all required fields
-            from src.models.newsletter import Newsletter
-            current_time = datetime.now()
-            newsletter = Newsletter(
-                server_id=config.server_id,
-                newsletter_date=current_time.date(),
-                title=f"Daily Newsletter - {current_time.strftime('%B %d, %Y')}",
-                time_period_start=cutoff_time,
-                time_period_end=current_time,
-                analyzed_messages_count=len(recent_messages),
-                persona_used=config.persona
-            )
-            
-            # Generate using AI service
-            if self.ai_service:
-                completed_newsletter = await self.ai_service.generate_enhanced_newsletter(
-                    messages=recent_messages,
-                    server_config=config,
-                    newsletter=newsletter,
-                    use_semantic_enhancement=True
+        """Generate and send a newsletter for a server with retry logic."""
+        max_retries = 3
+        retry_delay = 5  # seconds
+        
+        for attempt in range(max_retries):
+            try:
+                logger.info(f"Generating newsletter for server {config.server_id} (attempt {attempt + 1}/{max_retries})")
+                
+                # Get recent messages
+                message_repo = self.container.get_message_repository()
+                cutoff_time = datetime.now() - timedelta(hours=24)
+                
+                recent_messages = await message_repo.get_by_server_and_time_range(
+                    config.server_id, cutoff_time, datetime.now()
                 )
                 
-                # Save to database
-                newsletter_repo = self.container.get_newsletter_repository()
-                await newsletter_repo.create(completed_newsletter)
+                if len(recent_messages) < 5:
+                    logger.info(f"Insufficient messages for newsletter in server {config.server_id}")
+                    return
                 
-                # Send to Discord channel
-                await self._send_newsletter_to_channel(completed_newsletter, config)
+                # Create newsletter object with all required fields
+                from src.models.newsletter import Newsletter
+                current_time = datetime.now()
+                newsletter = Newsletter(
+                    server_id=config.server_id,
+                    newsletter_date=current_time.date(),
+                    title=f"Daily Newsletter - {current_time.strftime('%B %d, %Y')}",
+                    time_period_start=cutoff_time,
+                    time_period_end=current_time,
+                    analyzed_messages_count=len(recent_messages),
+                    persona_used=config.persona
+                )
                 
-                logger.info(f"Newsletter generated and sent for server {config.server_id}")
-            
-        except Exception as e:
-            logger.error(f"Failed to generate newsletter for server {config.server_id}: {e}")
+                # Generate using AI service
+                if self.ai_service:
+                    completed_newsletter = await self.ai_service.generate_enhanced_newsletter(
+                        messages=recent_messages,
+                        server_config=config,
+                        newsletter=newsletter,
+                        use_semantic_enhancement=True
+                    )
+                    
+                    # Save to database
+                    newsletter_repo = self.container.get_newsletter_repository()
+                    await newsletter_repo.create(completed_newsletter)
+                    
+                    # Send to Discord channel
+                    await self._send_newsletter_to_channel(completed_newsletter, config)
+                    
+                    logger.info(f"Newsletter generated and sent for server {config.server_id}")
+                    return  # Success - exit retry loop
+                
+            except Exception as e:
+                logger.error(f"Failed to generate newsletter for server {config.server_id} (attempt {attempt + 1}): {e}")
+                
+                if attempt < max_retries - 1:
+                    logger.info(f"Retrying newsletter generation in {retry_delay} seconds...")
+                    await asyncio.sleep(retry_delay)
+                    retry_delay *= 2  # Exponential backoff
+                else:
+                    logger.error(f"All {max_retries} attempts failed for newsletter generation in server {config.server_id}")
+                    
+                    # Create failed newsletter record for retry tracking
+                    try:
+                        from src.models.newsletter import Newsletter
+                        current_time = datetime.now()
+                        failed_newsletter = Newsletter(
+                            server_id=config.server_id,
+                            newsletter_date=current_time.date(),
+                            title=f"Failed Newsletter - {current_time.strftime('%B %d, %Y')}",
+                            time_period_start=current_time - timedelta(hours=24),
+                            time_period_end=current_time,
+                            analyzed_messages_count=0,
+                            persona_used=config.persona
+                        )
+                        failed_newsletter.mark_failed(f"Failed after {max_retries} attempts: {str(e)}", True)
+                        
+                        # Save failed newsletter to database for retry tracking
+                        newsletter_repo = self.container.get_newsletter_repository()
+                        await newsletter_repo.create(failed_newsletter)
+                        logger.info(f"Created failed newsletter record for retry tracking in server {config.server_id}")
+                        
+                    except Exception as failed_record_error:
+                        logger.error(f"Failed to create failed newsletter record: {failed_record_error}")
+                    
+                    # Send notification about failure to bot updates channel if configured
+                    try:
+                        if config.bot_updates_channel_id:
+                            channel = self.get_channel(int(config.bot_updates_channel_id))
+                            if channel:
+                                embed = discord.Embed(
+                                    title="⚠️ Newsletter Generation Failed",
+                                    description=f"Failed to generate newsletter after {max_retries} attempts. Will retry in 2 hours. Error: {str(e)[:200]}",
+                                    color=discord.Color.red(),
+                                    timestamp=datetime.now()
+                                )
+                                await channel.send(embed=embed)
+                    except Exception as notification_error:
+                        logger.error(f"Failed to send newsletter failure notification: {notification_error}")
     
     async def _send_newsletter_to_channel(self, newsletter, config: ServerConfig):
         """Send newsletter to the configured Discord channel."""
