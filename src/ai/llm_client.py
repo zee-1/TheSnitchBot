@@ -14,6 +14,8 @@ from enum import Enum
 from src.core.config import Settings
 from src.core.exceptions import AIServiceError, AIProviderError, AIQuotaExceededError, AIModelNotAvailableError
 from src.core.logging import get_logger, log_api_call
+from src.core.llm_logger import get_llm_logger, log_chain_step, log_llm_error, log_performance
+from src.core.llm_decorators import log_llm_service
 from src.utils.retry import api_retry
 
 logger = get_logger(__name__)
@@ -310,6 +312,7 @@ class LLMClient:
         }
     
     @api_retry
+    @log_llm_service("LLMClient", include_result=False, include_params=True)
     async def chat_completion(
         self,
         messages: List[Dict[str, str]],
@@ -318,6 +321,9 @@ class LLMClient:
         provider: Optional[LLMProvider] = None,
         temperature: float = 0.7,
         max_tokens: Optional[int] = None,
+        server_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+        command: Optional[str] = None,
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -351,6 +357,17 @@ class LLMClient:
             
             logger.info(f"Routing {task_type} task to {selected_provider} with model {selected_model}")
             
+            # Extract prompt for logging
+            prompt_text = ""
+            if messages:
+                # Combine messages into a single prompt string for logging
+                prompt_parts = []
+                for msg in messages[-3:]:  # Log last 3 messages for context
+                    role = msg.get("role", "unknown")
+                    content = msg.get("content", "")
+                    prompt_parts.append(f"[{role}] {content[:200]}")
+                prompt_text = " | ".join(prompt_parts)
+            
             # Make request to appropriate provider
             if selected_provider == LLMProvider.GROQ:
                 result = await self._make_groq_request(
@@ -369,6 +386,14 @@ class LLMClient:
             
             duration_ms = (datetime.now() - start_time).total_seconds() * 1000
             
+            # Extract response content
+            response_content = ""
+            usage_stats = {}
+            if result and "choices" in result and result["choices"]:
+                response_content = result["choices"][0].get("message", {}).get("content", "")
+                usage_stats = result.get("usage", {})
+            
+            # Log to existing system
             log_api_call(
                 service=selected_provider.value,
                 endpoint="/chat/completions",
@@ -377,27 +402,110 @@ class LLMClient:
                 duration_ms=duration_ms
             )
             
+            # Log to LLM chain logger
+            try:
+                await log_chain_step(
+                    chain_step="llm_completion",
+                    provider=selected_provider.value,
+                    model=selected_model,
+                    task_type=task_type.value,
+                    prompt=prompt_text,
+                    response=response_content,
+                    duration_ms=duration_ms,
+                    usage_stats=usage_stats,
+                    parameters={
+                        "temperature": temperature,
+                        "max_tokens": max_tokens,
+                        **kwargs
+                    },
+                    server_id=server_id,
+                    user_id=user_id,
+                    command=command
+                )
+            except Exception as log_error:
+                logger.warning(f"Failed to log LLM completion: {log_error}")
+            
             logger.info(
                 "LLM completion successful",
                 provider=selected_provider.value,
                 model=selected_model,
                 task_type=task_type.value,
-                duration_ms=duration_ms
+                duration_ms=duration_ms,
+                tokens_used=usage_stats.get("total_tokens", 0)
             )
             
             return result
             
         except Exception as e:
+            # Log the error
+            try:
+                await log_llm_error(
+                    error_message=str(e),
+                    service_name="LLMClient",
+                    method_name="chat_completion",
+                    provider=selected_provider.value if 'selected_provider' in locals() else None,
+                    model=selected_model if 'selected_model' in locals() else None,
+                    parameters={
+                        "task_type": task_type.value,
+                        "temperature": temperature,
+                        "max_tokens": max_tokens
+                    },
+                    server_id=server_id,
+                    user_id=user_id,
+                    metadata={"command": command}
+                )
+            except Exception as log_error:
+                logger.warning(f"Failed to log LLM error: {log_error}")
+            
             # Try fallback provider for final tasks
-            if task_type == TaskType.FINAL and selected_provider == LLMProvider.GEMINI:
+            if task_type == TaskType.FINAL and 'selected_provider' in locals() and selected_provider == LLMProvider.GEMINI:
                 logger.warning(f"Gemini failed for final task, falling back to Mistral: {e}")
                 try:
-                    return await self._make_mistral_request(
+                    fallback_result = await self._make_mistral_request(
                         messages, self.providers[LLMProvider.MISTRAL]["models"]["large"], 
                         temperature, max_tokens, **kwargs
                     )
+                    
+                    # Log successful fallback
+                    try:
+                        duration_ms = (datetime.now() - start_time).total_seconds() * 1000
+                        response_content = fallback_result["choices"][0].get("message", {}).get("content", "") if fallback_result.get("choices") else ""
+                        
+                        await log_chain_step(
+                            chain_step="llm_completion_fallback",
+                            provider="mistral",
+                            model=self.providers[LLMProvider.MISTRAL]["models"]["large"],
+                            task_type=task_type.value,
+                            prompt=prompt_text if 'prompt_text' in locals() else "",
+                            response=response_content,
+                            duration_ms=duration_ms,
+                            usage_stats=fallback_result.get("usage", {}),
+                            server_id=server_id,
+                            user_id=user_id,
+                            command=command,
+                            metadata={"fallback_from": "gemini", "original_error": str(e)}
+                        )
+                    except Exception as log_error:
+                        logger.warning(f"Failed to log fallback completion: {log_error}")
+                    
+                    return fallback_result
+                    
                 except Exception as fallback_error:
                     logger.error(f"Fallback to Mistral also failed: {fallback_error}")
+                    # Log fallback failure
+                    try:
+                        await log_llm_error(
+                            error_message=f"Fallback failed: {fallback_error}",
+                            service_name="LLMClient",
+                            method_name="chat_completion_fallback",
+                            provider="mistral",
+                            model=self.providers[LLMProvider.MISTRAL]["models"]["large"],
+                            server_id=server_id,
+                            user_id=user_id,
+                            metadata={"original_error": str(e), "fallback_error": str(fallback_error)}
+                        )
+                    except:
+                        pass
             
             logger.error(f"LLM completion failed: {e}")
             raise

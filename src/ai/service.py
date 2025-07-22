@@ -10,6 +10,7 @@ import logging
 from src.ai.llm_client import LLMClient, get_llm_client
 from src.ai.pipeline import NewsletterPipeline, get_newsletter_pipeline
 from src.ai.embedding_service import EmbeddingService, get_embedding_service
+from src.core.llm_logger import get_llm_logger, close_llm_logger
 from src.models.message import Message
 from src.models.server import ServerConfig, PersonaType
 from src.models.newsletter import Newsletter
@@ -34,6 +35,7 @@ class AIService:
         self.llm_client: Optional[LLMClient] = None
         self.newsletter_pipeline: Optional[NewsletterPipeline] = None
         self.embedding_service: Optional[EmbeddingService] = None
+        self.llm_logger = None
         self._initialized = False
     
     async def initialize(self) -> None:
@@ -46,6 +48,9 @@ class AIService:
             self.llm_client = await get_llm_client()
             self.newsletter_pipeline = await get_newsletter_pipeline(self.llm_client)
             self.embedding_service = await get_embedding_service()
+            
+            # Initialize LLM logger
+            self.llm_logger = await get_llm_logger()
             
             self._initialized = True
             logger.info("AIService initialized successfully")
