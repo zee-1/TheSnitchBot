@@ -53,10 +53,10 @@ class Settings(BaseSettings):
     groq_api_key: str = Field(..., env="GROQ_API_KEY")
     groq_model_name: str = Field("mixtral-8x7b-32768", env="GROQ_MODEL_NAME")
     groq_model_thinking:str =Field("deepseek-r1-distill-llama-70b",env="GROQ_THINKING_MODEL")
-    gemini_endpoint:str =Field(...,env="GEMINI_ENDPOINT")
+    gemini_endpoint:str =Field("https://generativelanguage.googleapis.com/v1beta/models",env="GEMINI_ENDPOINT")
     gemini_api_key: str =Field(...,env="GEMINI_API_KEY")
-    gemini_pro_model:str = Field("gemini-1.5-pro-latest",env="GEMINI_PRO_MODEL")
-    gemini_flash_model:str = Field("gemini-1.5-flash-latest",env="GEMINI_FLASH_MODEL")
+    gemini_pro_model:str = Field("gemini-1.5-pro",env="GEMINI_PRO_MODEL")
+    gemini_flash_model:str = Field("gemini-1.5-flash",env="GEMINI_FLASH_MODEL")
     
     mistral_endpoint:str = Field(...,env="MISTRAL_ENDPOINT")
     mistral_api_key:str= Field(...,env="MISTRAL_API_KEY")

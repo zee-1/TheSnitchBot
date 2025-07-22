@@ -202,8 +202,10 @@ class LLMClient:
             }
         }
         
+        # Construct URL properly to avoid double slashes
+        base_url = config['base_url'].rstrip('/')
         response = await client.post(
-            f"{config['base_url']}/v1/models/{model}:generateContent",
+            f"{base_url}/{model}:generateContent",
             json=payload
         )
         
@@ -252,7 +254,7 @@ class LLMClient:
             payload["max_tokens"] = max_tokens
         
         response = await client.post(
-            f"{config['base_url']}/chat/completions",
+            f"{config['base_url']}",
             json=payload
         )
         
@@ -276,23 +278,27 @@ class LLMClient:
     def _convert_to_gemini_format(self, messages: List[Dict[str, str]]) -> List[Dict[str, Any]]:
         """Convert OpenAI format messages to Gemini format."""
         gemini_messages = []
-        
+        system_content_buffer = []
+
+        other_messages = []
         for msg in messages:
-            role = msg["role"]
-            content = msg["content"]
-            
-            if role == "system":
-                # Gemini doesn't have system role, prepend to first user message
-                if gemini_messages:
-                    # Add to existing user message
-                    gemini_messages[0]["parts"][0]["text"] = f"System: {content}\n\n{gemini_messages[0]['parts'][0]['text']}"
-                else:
-                    # Create first message with system prompt
-                    gemini_messages.append({
-                        "role": "user",
-                        "parts": [{"text": f"System: {content}"}]
-                    })
-            elif role == "user":
+            if msg.get("role") == "system":
+                system_content_buffer.append(msg.get("content", ""))
+            else:
+                other_messages.append(msg)
+        
+        full_system_prompt = "\n".join(system_content_buffer)
+
+        is_first_user_message = True
+        for msg in other_messages:
+            role = msg.get("role")
+            content = msg.get("content", "")
+
+            if role == "user":
+                if full_system_prompt and is_first_user_message:
+                    content = f"{full_system_prompt}\n\n---\n\nUser: {content}"
+                    is_first_user_message = False
+
                 gemini_messages.append({
                     "role": "user",
                     "parts": [{"text": content}]
@@ -303,6 +309,12 @@ class LLMClient:
                     "parts": [{"text": content}]
                 })
         
+        if full_system_prompt and is_first_user_message:
+            gemini_messages.insert(0, {
+                "role": "user",
+                "parts": [{"text": full_system_prompt}]
+            })
+
         return gemini_messages
     
     def _convert_from_gemini_format(self, gemini_response: Dict[str, Any]) -> Dict[str, Any]:
