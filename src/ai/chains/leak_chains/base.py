@@ -73,7 +73,7 @@ class BaseLeakChain(ABC):
         self,
         prompt: str,
         temperature: float = 0.7,
-        max_tokens: int = 1000,
+        max_tokens: int = 4096,
         fallback_response: Optional[str] = None
     ) -> str:
         """Safely get AI completion with error handling."""
