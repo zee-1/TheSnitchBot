@@ -111,7 +111,13 @@ class ContextAnalyzer(BaseLeakChain):
     def _analyze_communication_style(self, target_messages: List[str]) -> Dict[str, Any]:
         """Analyze user's communication patterns."""
         if not target_messages:
-            return {"style": "minimal", "confidence": 0.1}
+            return {
+                "style": "minimal", 
+                "avg_message_length": 0.0,
+                "emoji_usage": 0.0,
+                "expressiveness": 0.0,
+                "confidence": 0.1
+            }
         
         total_chars = sum(len(msg) for msg in target_messages)
         avg_length = total_chars / len(target_messages) if target_messages else 0
@@ -272,15 +278,15 @@ class ContextAnalyzer(BaseLeakChain):
         prompt = f"""Analyze the following context to determine relevance factors for generating humorous leak content about {target_name}.
 
 USER CONTEXT:
-- Communication Style: {communication_style['style']} (confidence: {communication_style['confidence']:.2f})
-- Average Message Length: {communication_style['avg_message_length']:.1f} characters
-- Expressiveness: {communication_style['expressiveness']:.2f}
+- Communication Style: {communication_style.get('style', 'unknown')} (confidence: {communication_style.get('confidence', 0):.2f})
+- Average Message Length: {communication_style.get('avg_message_length', 0):.1f} characters
+- Expressiveness: {communication_style.get('expressiveness', 0):.2f}
 - User Interests: {', '.join(user_interests)}
 
 SERVER CONTEXT:
 - Active Topics: {', '.join(active_topics)}
-- Server Culture: {server_culture['culture_type']}
-- Activity Level: {server_culture['activity_level']}
+- Server Culture: {server_culture.get('culture_type', 'unknown')}
+- Activity Level: {server_culture.get('activity_level', 'unknown')}
 - Bot Persona: {persona.value if hasattr(persona, 'value') else str(persona)}
 
 Please provide relevance scores (0.0 to 1.0) for different content types:
@@ -336,11 +342,18 @@ Provide brief reasoning for each score."""
     ) -> str:
         """Generate a summary of the reasoning process."""
         
-        style_desc = f"{communication_style['style']} communicator with {communication_style['confidence']:.0%} confidence"
-        interests_desc = ', '.join(user_interests[:3])
-        topics_desc = ', '.join(active_topics[:3])
+        style = communication_style.get('style', 'unknown')
+        confidence = communication_style.get('confidence', 0)
+        style_desc = f"{style} communicator with {confidence:.0%} confidence"
+        interests_desc = ', '.join(user_interests[:3]) if user_interests else 'general topics'
+        topics_desc = ', '.join(active_topics[:3]) if active_topics else 'general chat'
         
-        top_relevance = max(relevance_factors.items(), key=lambda x: x[1])
+        if relevance_factors:
+            top_relevance = max(relevance_factors.items(), key=lambda x: x[1])
+            strategy_desc = f"Focus on {top_relevance[0]}-related humor with server culture integration."
+        else:
+            top_relevance = ('general', 0.5)
+            strategy_desc = "Use general humor approach."
         
         reasoning = f"""Context Analysis for {target_name}:
 
@@ -349,7 +362,7 @@ Primary Interests: {interests_desc}
 Server Activity: {topics_desc}
 
 Highest Relevance Factor: {top_relevance[0]} ({top_relevance[1]:.2f})
-Content Strategy: Focus on {top_relevance[0]}-related humor with server culture integration."""
+Content Strategy: {strategy_desc}"""
         
         return reasoning
     

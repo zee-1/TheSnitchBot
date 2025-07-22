@@ -6,8 +6,9 @@ Manages privacy settings and opt-out preferences for community analysis features
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 from enum import Enum
+from pydantic import Field
 
-from src.models.base import BaseModel, CosmosDBEntity
+from src.models.base import CosmosDBEntity
 from src.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -35,28 +36,22 @@ class FeatureOptOut(Enum):
 class UserPreferences(CosmosDBEntity):
     """User preferences for privacy and participation."""
     
-    def __init__(
-        self,
-        user_id: str,
-        server_id: str,
-        privacy_level: PrivacyLevel = PrivacyLevel.FULL_PARTICIPATION,
-        feature_opt_outs: Optional[List[FeatureOptOut]] = None,
-        anonymous_in_analysis: bool = False,
-        exclude_from_social_mapping: bool = False,
-        **kwargs
-    ):
-        # Set required CosmosDBEntity fields
-        kwargs['partition_key'] = server_id
-        kwargs['entity_type'] = 'user_preferences'
+    user_id: str = Field(..., description="Discord user ID")
+    server_id: str = Field(..., description="Discord server ID")  
+    privacy_level: PrivacyLevel = Field(default=PrivacyLevel.FULL_PARTICIPATION, description="User's privacy level")
+    feature_opt_outs: List[FeatureOptOut] = Field(default_factory=list, description="Features user has opted out of")
+    anonymous_in_analysis: bool = Field(default=False, description="Whether user should be anonymous in analysis")
+    exclude_from_social_mapping: bool = Field(default=False, description="Whether to exclude from social mapping")
+    last_updated: datetime = Field(default_factory=lambda: datetime.now(), description="Last update timestamp")
+    
+    def __init__(self, **data):
+        # Ensure partition_key and entity_type are set for CosmosDBEntity
+        if 'partition_key' not in data and 'server_id' in data:
+            data['partition_key'] = data['server_id']
+        if 'entity_type' not in data:
+            data['entity_type'] = 'user_preferences'
         
-        super().__init__(**kwargs)
-        self.user_id = user_id
-        self.server_id = server_id
-        self.privacy_level = privacy_level
-        self.feature_opt_outs = feature_opt_outs or []
-        self.anonymous_in_analysis = anonymous_in_analysis
-        self.exclude_from_social_mapping = exclude_from_social_mapping
-        self.last_updated = datetime.now()
+        super().__init__(**data)
     
     
     def is_opted_out_of(self, feature: FeatureOptOut) -> bool:
@@ -120,48 +115,51 @@ class UserPreferences(CosmosDBEntity):
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for database storage."""
-        return {
-            "id": self.id,
-            "user_id": self.user_id,
-            "server_id": self.server_id,
-            "privacy_level": self.privacy_level.value,
-            "feature_opt_outs": [opt.value for opt in self.feature_opt_outs],
-            "anonymous_in_analysis": self.anonymous_in_analysis,
-            "exclude_from_social_mapping": self.exclude_from_social_mapping,
-            "last_updated": self.last_updated.isoformat(),
-            "created_at": self.created_at.isoformat(),
-            "updated_at": self.updated_at.isoformat() if hasattr(self, 'updated_at') else self.last_updated.isoformat()
-        }
+        data = self.model_dump()
+        # Convert enums to values for storage
+        if isinstance(data.get("privacy_level"), PrivacyLevel):
+            data["privacy_level"] = data["privacy_level"].value
+        if isinstance(data.get("feature_opt_outs"), list):
+            data["feature_opt_outs"] = [
+                opt.value if isinstance(opt, FeatureOptOut) else opt
+                for opt in data["feature_opt_outs"]
+            ]
+        # Convert datetime objects to ISO format strings
+        if isinstance(data.get("last_updated"), datetime):
+            data["last_updated"] = data["last_updated"].isoformat()
+        # Note: created_at and updated_at from base class should already be strings
+        return data
     
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "UserPreferences":
         """Create instance from dictionary."""
-        # Parse enums
-        privacy_level = PrivacyLevel(data.get("privacy_level", "full"))
-        feature_opt_outs = [
-            FeatureOptOut(opt) for opt in data.get("feature_opt_outs", [])
-        ]
+        # Make a copy to avoid modifying original data
+        data = data.copy()
         
-        # Parse timestamps
-        last_updated = data.get("last_updated")
-        if isinstance(last_updated, str):
-            last_updated = datetime.fromisoformat(last_updated)
+        # Parse enums if they're strings
+        if isinstance(data.get("privacy_level"), str):
+            data["privacy_level"] = PrivacyLevel(data["privacy_level"])
+        if isinstance(data.get("feature_opt_outs"), list):
+            data["feature_opt_outs"] = [
+                FeatureOptOut(opt) if isinstance(opt, str) else opt
+                for opt in data.get("feature_opt_outs", [])
+            ]
         
-        created_at = data.get("created_at")
-        if isinstance(created_at, str):
-            created_at = datetime.fromisoformat(created_at)
+        # Convert datetime objects to ISO strings for Pydantic validation
+        # The base class expects created_at and updated_at as strings
+        if isinstance(data.get("last_updated"), str):
+            data["last_updated"] = datetime.fromisoformat(data["last_updated"])
+        elif isinstance(data.get("last_updated"), datetime):
+            # Keep as datetime for our field
+            pass
         
-        return cls(
-            user_id=data["user_id"],
-            server_id=data["server_id"],
-            privacy_level=privacy_level,
-            feature_opt_outs=feature_opt_outs,
-            anonymous_in_analysis=data.get("anonymous_in_analysis", False),
-            exclude_from_social_mapping=data.get("exclude_from_social_mapping", False),
-            id=data.get("id"),
-            created_at=created_at,
-            last_updated=last_updated or datetime.now()
-        )
+        # Base class fields should stay as strings
+        if isinstance(data.get("created_at"), datetime):
+            data["created_at"] = data["created_at"].isoformat()
+        if isinstance(data.get("updated_at"), datetime):
+            data["updated_at"] = data["updated_at"].isoformat()
+        
+        return cls(**data)
     
     def get_privacy_summary(self) -> str:
         """Get human-readable privacy summary."""
