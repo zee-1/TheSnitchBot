@@ -6,6 +6,8 @@ Implements improved random user selection with better filtering.
 from typing import List, Dict, Any, Optional
 import random
 from datetime import datetime, timedelta, timezone
+from .base import BaseLeakChain
+from src.ai.llm_client import TaskType
 from src.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -388,3 +390,21 @@ def get_user_selector() -> EnhancedUserSelector:
         _user_selector = EnhancedUserSelector()
     
     return _user_selector
+
+
+class UserSelector(BaseLeakChain):
+    """BaseLeakChain wrapper for user selection with TaskType support."""
+    
+    task_type = TaskType.ANALYSIS  # Analysis of user data for selection
+    
+    def __init__(self, llm_client):
+        super().__init__(llm_client)
+        self.selector = EnhancedUserSelector()
+    
+    async def process(self, *args, **kwargs):
+        """Process user selection - delegates to EnhancedUserSelector."""
+        return await self.select_user(*args, **kwargs)
+    
+    async def select_user(self, messages, guild, recent_targets=None):
+        """Select a user for leak generation."""
+        return self.selector.select_user(messages, guild, recent_targets)

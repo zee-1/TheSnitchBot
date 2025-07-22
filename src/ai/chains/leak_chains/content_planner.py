@@ -8,12 +8,15 @@ import uuid
 from .base import BaseLeakChain, ContextAnalysis, ContentConcept, ContentPlan
 from src.models.server import PersonaType
 from src.core.logging import get_logger
+from src.ai.llm_client import TaskType
 
 logger = get_logger(__name__)
 
 
 class ContentPlanner(BaseLeakChain):
     """Plans content concepts for leak generation based on context analysis."""
+    
+    task_type = TaskType.THINKING  # Complex content planning and reasoning
     
     async def process(self, *args, **kwargs) -> ContentPlan:
         """Process method required by BaseLeakChain interface."""

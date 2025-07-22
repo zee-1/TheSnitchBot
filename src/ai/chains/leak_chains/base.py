@@ -5,7 +5,7 @@ Base classes for leak command Chain of Thoughts implementation.
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
-from src.ai.llm_client import LLMClient
+from src.ai.llm_client import LLMClient, TaskType
 from src.core.logging import get_logger
 logger = get_logger(__name__)
 
@@ -57,6 +57,9 @@ class LeakContent:
 class BaseLeakChain(ABC):
     """Base class for leak command CoT chains."""
     
+    # Each subclass should override this to specify their task type
+    task_type: TaskType = TaskType.ANALYSIS
+    
     def __init__(self, llm_client: LLMClient):
         self.llm_client = llm_client
         self.logger = get_logger(self.__class__.__name__)
@@ -78,7 +81,8 @@ class BaseLeakChain(ABC):
             response = await self.llm_client.simple_completion(
                 prompt=prompt,
                 temperature=temperature,
-                max_tokens=max_tokens
+                max_tokens=max_tokens,
+                task_type=self.task_type  # Use the chain's task type
             )
             return response.strip()
         except Exception as e:

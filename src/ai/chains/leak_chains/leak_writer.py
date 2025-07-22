@@ -8,12 +8,15 @@ import random
 from .base import BaseLeakChain, ContentPlan, LeakContent
 from src.models.server import PersonaType
 from src.core.logging import get_logger
+from src.ai.llm_client import TaskType
 
 logger = get_logger(__name__)
 
 
 class LeakWriter(BaseLeakChain):
     """Writes final leak content based on planned concept."""
+    
+    task_type = TaskType.FINAL  # Final content generation
     
     async def process(self, *args, **kwargs) -> LeakContent:
         """Process method required by BaseLeakChain interface."""

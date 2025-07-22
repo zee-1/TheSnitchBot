@@ -11,12 +11,15 @@ from collections import Counter
 from .base import BaseLeakChain, ContextAnalysis
 from src.models.server import ServerConfig, PersonaType
 from src.core.logging import get_logger
+from src.ai.llm_client import TaskType
 
 logger = get_logger(__name__)
 
 
 class ContextAnalyzer(BaseLeakChain):
     """Analyzes server and user context for leak generation."""
+    
+    task_type = TaskType.THINKING  # Complex reasoning and analysis
     
     async def process(self, *args, **kwargs) -> ContextAnalysis:
         """Process method required by BaseLeakChain interface."""
