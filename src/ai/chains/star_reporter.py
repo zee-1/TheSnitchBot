@@ -7,7 +7,8 @@ from typing import List, Dict, Any, Optional
 import logging
 from datetime import datetime
 
-from src.ai.llm_client import LLMClient
+from .base_newsletter_chain import BaseNewsletterChain
+from src.ai.llm_client import LLMClient, TaskType
 from src.ai.prompts.newsletter import NewsletterPrompts
 from src.models.message import Message
 from src.models.server import PersonaType
@@ -17,11 +18,10 @@ from src.core.logging import get_logger
 logger = get_logger(__name__)
 
 
-class StarReporterChain:
+class StarReporterChain(BaseNewsletterChain):
     """Chain C: Writes the final newsletter article."""
     
-    def __init__(self, llm_client: LLMClient):
-        self.llm_client = llm_client
+    task_type = TaskType.FINAL  # Final article writing
     
     async def write_article(
         self,
@@ -74,13 +74,18 @@ class StarReporterChain:
             Write the complete newsletter article now:
             """
             
-            # Generate the article
-            article = await self.llm_client.conversation_completion(
-                conversation=[{"role": "user", "content": writing_prompt}],
-                system_prompt=system_prompt,
+            # Generate the article with TaskType routing
+            messages = []
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt})
+            messages.append({"role": "user", "content": writing_prompt})
+            
+            response_data = await self._safe_ai_chat_completion(
+                messages=messages,
                 temperature=0.8,  # Higher temperature for creative writing
                 max_tokens=1200
             )
+            article = response_data["choices"][0]["message"]["content"]
             
             # Post-process the article
             processed_article = self._post_process_article(article, selected_story, persona)
@@ -292,12 +297,17 @@ class StarReporterChain:
             Write only the bulletin, nothing else:
             """
             
-            bulletin = await self.llm_client.conversation_completion(
-                conversation=[{"role": "user", "content": breaking_prompt}],
-                system_prompt=system_prompt,
+            messages = []
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt})
+            messages.append({"role": "user", "content": breaking_prompt})
+            
+            response_data = await self._safe_ai_chat_completion(
+                messages=messages,
                 temperature=0.8,
                 max_tokens=300
             )
+            bulletin = response_data["choices"][0]["message"]["content"]
             
             return bulletin.strip()
         

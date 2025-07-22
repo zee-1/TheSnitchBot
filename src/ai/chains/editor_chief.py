@@ -6,7 +6,8 @@ Selects the best story from candidates identified by News Desk.
 from typing import List, Dict, Any, Optional
 import logging
 
-from src.ai.llm_client import LLMClient
+from .base_newsletter_chain import BaseNewsletterChain
+from src.ai.llm_client import LLMClient, TaskType
 from src.ai.prompts.newsletter import NewsletterPrompts
 from src.models.server import PersonaType
 from src.core.exceptions import AIServiceError
@@ -15,11 +16,10 @@ from src.core.logging import get_logger
 logger = get_logger(__name__)
 
 
-class EditorChiefChain:
+class EditorChiefChain(BaseNewsletterChain):
     """Chain B: Selects the best story for the newsletter headline."""
     
-    def __init__(self, llm_client: LLMClient):
-        self.llm_client = llm_client
+    task_type = TaskType.THINKING  # Complex editorial decision-making
     
     async def select_headline(
         self,
@@ -69,13 +69,18 @@ class EditorChiefChain:
             Select ONE story and explain your editorial decision.
             """
             
-            # Get AI editorial decision
-            response = await self.llm_client.conversation_completion(
-                conversation=[{"role": "user", "content": editorial_prompt}],
-                system_prompt=system_prompt,
+            # Get AI editorial decision with TaskType routing
+            messages = []
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt})
+            messages.append({"role": "user", "content": editorial_prompt})
+            
+            response_data = await self._safe_ai_chat_completion(
+                messages=messages,
                 temperature=0.6,  # Slightly lower temperature for editorial decisions
                 max_tokens=800
             )
+            response = response_data["choices"][0]["message"]["content"]
             
             # Parse editorial decision
             selected_story = self._parse_editorial_decision(response, story_candidates)
@@ -158,12 +163,17 @@ class EditorChiefChain:
             4. Any concerns or adjustments needed
             """
             
-            response = await self.llm_client.conversation_completion(
-                conversation=[{"role": "user", "content": review_prompt}],
-                system_prompt=system_prompt,
+            messages = []
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt})
+            messages.append({"role": "user", "content": review_prompt})
+            
+            response_data = await self._safe_ai_chat_completion(
+                messages=messages,
                 temperature=0.6,
                 max_tokens=500
             )
+            response = response_data["choices"][0]["message"]["content"]
             
             # Add editorial review to story
             reviewed_story = {

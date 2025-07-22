@@ -7,7 +7,8 @@ from typing import List, Dict, Any, Optional
 import json
 import logging
 
-from src.ai.llm_client import LLMClient
+from .base_newsletter_chain import BaseNewsletterChain
+from src.ai.llm_client import LLMClient, TaskType
 from src.ai.prompts.newsletter import NewsletterPrompts
 from src.models.message import Message
 from src.models.server import PersonaType
@@ -17,11 +18,10 @@ from src.core.logging import get_logger
 logger = get_logger(__name__)
 
 
-class NewsDeskChain:
+class NewsDeskChain(BaseNewsletterChain):
     """Chain A: Identifies newsworthy stories from messages."""
     
-    def __init__(self, llm_client: LLMClient):
-        self.llm_client = llm_client
+    task_type = TaskType.ANALYSIS  # Analysis of messages to identify stories
     
     async def identify_stories(
         self,
@@ -68,13 +68,18 @@ class NewsDeskChain:
             Provide exactly {max_stories} story candidates.
             """
             
-            # Get AI response
-            response = await self.llm_client.conversation_completion(
-                conversation=[{"role": "user", "content": analysis_prompt}],
-                system_prompt=system_prompt,
+            # Get AI response with TaskType routing
+            messages = []
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt})
+            messages.append({"role": "user", "content": analysis_prompt})
+            
+            response_data = await self._safe_ai_chat_completion(
+                messages=messages,
                 temperature=0.7,
                 max_tokens=1000
             )
+            response = response_data["choices"][0]["message"]["content"]
             
             # Parse stories from response
             stories = self._parse_stories_response(response, messages)
