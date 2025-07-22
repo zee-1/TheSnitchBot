@@ -83,7 +83,7 @@ class StarReporterChain(BaseNewsletterChain):
             response_data = await self._safe_ai_chat_completion(
                 messages=messages,
                 temperature=0.8,  # Higher temperature for creative writing
-                max_tokens=1200
+                max_tokens=3096
             )
             article = response_data["choices"][0]["message"]["content"]
             
@@ -305,7 +305,7 @@ class StarReporterChain(BaseNewsletterChain):
             response_data = await self._safe_ai_chat_completion(
                 messages=messages,
                 temperature=0.8,
-                max_tokens=300
+                max_tokens=3096
             )
             bulletin = response_data["choices"][0]["message"]["content"]
             

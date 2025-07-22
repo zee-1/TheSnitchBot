@@ -122,7 +122,7 @@ Write ONLY the leak content itself. Do not include explanations or metadata."""
             content = await self._safe_ai_completion(
                 prompt=prompt,
                 temperature=0.9,
-                max_tokens=200,
+                max_tokens=2048,
                 fallback_response=self._get_fallback_content_text(target_name, persona)
             )
             

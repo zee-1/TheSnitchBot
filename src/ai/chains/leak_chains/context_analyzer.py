@@ -306,7 +306,7 @@ Provide brief reasoning for each score."""
             response = await self._safe_ai_completion(
                 prompt=prompt,
                 temperature=0.3,
-                max_tokens=300,
+                max_tokens=4096,
                 fallback_response="GAMING_RELEVANCE: 0.5\nSOCIAL_RELEVANCE: 0.6\nHOBBY_RELEVANCE: 0.5\nMEME_RELEVANCE: 0.4\nPERSONALITY_RELEVANCE: 0.7"
             )
             

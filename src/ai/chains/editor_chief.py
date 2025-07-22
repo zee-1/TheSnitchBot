@@ -78,7 +78,7 @@ class EditorChiefChain(BaseNewsletterChain):
             response_data = await self._safe_ai_chat_completion(
                 messages=messages,
                 temperature=0.6,  # Slightly lower temperature for editorial decisions
-                max_tokens=800
+                max_tokens=2048
             )
             response = response_data["choices"][0]["message"]["content"]
             
@@ -171,7 +171,7 @@ class EditorChiefChain(BaseNewsletterChain):
             response_data = await self._safe_ai_chat_completion(
                 messages=messages,
                 temperature=0.6,
-                max_tokens=500
+                max_tokens=2048
             )
             response = response_data["choices"][0]["message"]["content"]
             

@@ -77,7 +77,7 @@ class NewsDeskChain(BaseNewsletterChain):
             response_data = await self._safe_ai_chat_completion(
                 messages=messages,
                 temperature=0.7,
-                max_tokens=1000
+                max_tokens=2048
             )
             response = response_data["choices"][0]["message"]["content"]
             
@@ -274,7 +274,15 @@ class NewsDeskChain(BaseNewsletterChain):
         story_keywords = set(word.strip('.,!?') for word in story_text.split() if len(word) > 3)
         
         for message in messages:
-            message_text = message.content.lower()
+            # Handle both Message objects and dict objects
+            if hasattr(message, 'content'):
+                message_text = message.content.lower()
+                engagement_score = message.calculate_engagement_score()
+            else:
+                message_text = message.get('content', '').lower()
+                # Calculate basic engagement for dict messages
+                engagement_score = (message.get('total_reactions', 0) + message.get('reply_count', 0)) / 10.0
+            
             message_keywords = set(word.strip('.,!?') for word in message_text.split() if len(word) > 3)
             
             # Check for keyword overlap
@@ -282,11 +290,15 @@ class NewsDeskChain(BaseNewsletterChain):
             overlap_ratio = keyword_overlap / len(story_keywords) if story_keywords else 0
             
             # Consider messages with good keyword overlap or high engagement
-            if overlap_ratio > 0.2 or message.calculate_engagement_score() > 0.5:
+            if overlap_ratio > 0.2 or engagement_score > 0.5:
                 related_messages.append(message)
         
         # Sort by engagement and return top messages
-        related_messages.sort(key=lambda m: m.calculate_engagement_score(), reverse=True)
+        related_messages.sort(
+            key=lambda m: m.calculate_engagement_score() if hasattr(m, 'calculate_engagement_score') 
+            else (m.get('total_reactions', 0) + m.get('reply_count', 0)) / 10.0, 
+            reverse=True
+        )
         return related_messages[:10]  # Top 10 related messages
     
     def _calculate_time_span(self, messages: List[Message]) -> float:

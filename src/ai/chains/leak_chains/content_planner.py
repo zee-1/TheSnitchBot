@@ -99,31 +99,35 @@ COMMUNICATION STYLE: {context_analysis.user_communication_style['style']}
 SERVER CULTURE: {context_analysis.server_culture_assessment['culture_type']}
 
 RELEVANCE FACTORS:
-- Gaming: {context_analysis.relevance_factors.get('gaming', 0.5):.2f}
+- Personality: {context_analysis.relevance_factors.get('personality', 0.5):.2f}
 - Social: {context_analysis.relevance_factors.get('social', 0.5):.2f}
 - Hobby: {context_analysis.relevance_factors.get('hobby', 0.5):.2f}
+- Gaming: {context_analysis.relevance_factors.get('gaming', 0.5):.2f}
 - Meme: {context_analysis.relevance_factors.get('meme', 0.5):.2f}
-- Personality: {context_analysis.relevance_factors.get('personality', 0.5):.2f}
 
 PERSONA: {persona.value if hasattr(persona, 'value') else str(persona)}
 
 Generate 4 distinct leak concepts, each focused on different themes:
 
-CONCEPT_1_THEME: Gaming/Tech related embarrassment
+
+CONCEPT_1_THEME: Personality quirk revelation
 CONCEPT_1_DESC: [Brief description of the concept]
 CONCEPT_1_HOOKS: [Key elements to make it personal and funny]
 
-CONCEPT_2_THEME: Social interaction mishap
+
+CONCEPT_2_THEME: Hobby/Interest obsession
 CONCEPT_2_DESC: [Brief description of the concept]
 CONCEPT_2_HOOKS: [Key elements to make it personal and funny]
 
-CONCEPT_3_THEME: Hobby/Interest obsession
+CONCEPT_3_THEME: Social interaction mishap
 CONCEPT_3_DESC: [Brief description of the concept]
 CONCEPT_3_HOOKS: [Key elements to make it personal and funny]
 
-CONCEPT_4_THEME: Personality quirk revelation
+
+CONCEPT_4_THEME: Gaming/Tech related embarrassment
 CONCEPT_4_DESC: [Brief description of the concept]
 CONCEPT_4_HOOKS: [Key elements to make it personal and funny]
+
 
 Keep concepts harmless, humorous, and appropriate for a Discord community."""
         
@@ -131,7 +135,7 @@ Keep concepts harmless, humorous, and appropriate for a Discord community."""
             response = await self._safe_ai_completion(
                 prompt=prompt,
                 temperature=0.8,
-                max_tokens=800,
+                max_tokens=4096,
                 fallback_response=self._get_fallback_concepts_text()
             )
             
