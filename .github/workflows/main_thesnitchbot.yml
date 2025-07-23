@@ -153,12 +153,11 @@ jobs:
           
           echo "✅ .env file created successfully."
           
-      - name: Upload .env file as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: env-file
-          path: .env
-          retention-days: 1
+      - name: Copy .env to persistent location
+        run: |
+          mkdir -p /tmp/github-actions-env
+          cp .env /tmp/github-actions-env/.env
+          echo "Environment file copied to persistent location"
 
   build:
     runs-on: self-hosted
@@ -168,10 +167,15 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
       
-    - name: Download .env file
-      uses: actions/download-artifact@v4
-      with:
-        name: env-file
+    - name: Restore .env file
+      run: |
+        if [ -f /tmp/github-actions-env/.env ]; then
+          cp /tmp/github-actions-env/.env .env
+          echo "✅ .env file restored"
+        else
+          echo "❌ .env file not found in persistent location"
+          exit 1
+        fi
 
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -190,20 +194,19 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
       
-    - name: Download .env file
-      uses: actions/download-artifact@v4
-      with:
-        name: env-file
-        
-    - name: Verify .env file exists
+    - name: Restore .env file
       run: |
-        if [ -f .env ]; then
-          echo "✅ .env file found"
+        if [ -f /tmp/github-actions-env/.env ]; then
+          cp /tmp/github-actions-env/.env .env
+          echo "✅ .env file restored"
           echo "Environment variables count: $(wc -l < .env)"
         else
-          echo "❌ .env file not found"
+          echo "❌ .env file not found in persistent location"
           exit 1
         fi
 
     - name: Restart application service
       run: sudo systemctl restart bot.service
+      
+    - name: Cleanup temporary files
+      run: rm -rf /tmp/github-actions-env
