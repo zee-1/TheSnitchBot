@@ -31,4 +31,4 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Restart application service
-      run: sudo systemctl restart bot-be.service
+      run: sudo systemctl restart bot.service
