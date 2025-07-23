@@ -152,12 +152,26 @@ jobs:
           echo "SKIP_DISCORD_VERIFICATION=$SKIP_DISCORD_VERIFICATION" >> .env
           
           echo "✅ .env file created successfully."
+          
+      - name: Upload .env file as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: env-file
+          path: .env
+          retention-days: 1
+
   build:
     runs-on: self-hosted
+    needs: create-env-file
 
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
+      
+    - name: Download .env file
+      uses: actions/download-artifact@v4
+      with:
+        name: env-file
 
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -175,6 +189,21 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
+      
+    - name: Download .env file
+      uses: actions/download-artifact@v4
+      with:
+        name: env-file
+        
+    - name: Verify .env file exists
+      run: |
+        if [ -f .env ]; then
+          echo "✅ .env file found"
+          echo "Environment variables count: $(wc -l < .env)"
+        else
+          echo "❌ .env file not found"
+          exit 1
+        fi
 
     - name: Restart application service
       run: sudo systemctl restart bot.service
