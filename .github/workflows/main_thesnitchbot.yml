@@ -22,8 +22,13 @@ jobs:
       run: pip install -r requirements.txt
 
   deploy:
+    name: Deploy to Server
+    needs: build
+    runs-on: self-hosted
+
+    steps:
     - name: Checkout repository
       uses: actions/checkout@v4
 
     - name: Restart application service
-      run: sudo systemctl restart bot.service
+      run: sudo systemctl restart bot-be.service
