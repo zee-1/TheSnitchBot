@@ -6,6 +6,152 @@ on:
       - main
 
 jobs:
+  create-env-file:
+    name: Create .env file on VM
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create .env file from secrets
+        env:
+          # --- Discord Configuration ---
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+          DISCORD_CLIENT_ID: ${{ secrets.DISCORD_CLIENT_ID }}
+          DISCORD_CLIENT_SECRET: ${{ secrets.DISCORD_CLIENT_SECRET }}
+
+          # --- Azure Configuration ---
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          COSMOS_CONNECTION_STRING: ${{ secrets.COSMOS_CONNECTION_STRING }}
+          COSMOS_DATABASE_NAME: ${{ secrets.COSMOS_DATABASE_NAME }}
+          COSMOS_CONTAINER_OPERATIONAL: ${{ secrets.COSMOS_CONTAINER_OPERATIONAL }}
+          COSMOS_CONTAINER_CONTENT: ${{ secrets.COSMOS_CONTAINER_CONTENT }}
+          BLOB_CONNECTION_STRING: ${{ secrets.BLOB_CONNECTION_STRING }}
+          BLOB_CONTAINER_NAME: ${{ secrets.BLOB_CONTAINER_NAME }}
+          SERVICE_BUS_CONNECTION_STRING: ${{ secrets.SERVICE_BUS_CONNECTION_STRING }}
+          SERVICE_BUS_QUEUE_MESSAGES: ${{ secrets.SERVICE_BUS_QUEUE_MESSAGES }}
+          SERVICE_BUS_TOPIC_EVENTS: ${{ secrets.SERVICE_BUS_TOPIC_EVENTS }}
+          KEY_VAULT_URL: ${{ secrets.KEY_VAULT_URL }}
+
+          # --- AI Services ---
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GROQ_ENDPOINT: ${{ secrets.GROQ_ENDPOINT }}
+          GROQ_MODEL_NAME: ${{ secrets.GROQ_MODEL_NAME }}
+          GROQ_THINKING_MODEL: ${{ secrets.GROQ_THINKING_MODEL }}
+          
+          # --- Google Gemini API ---
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_ENDPOINT: ${{ secrets.GEMINI_ENDPOINT }}
+          GEMINI_PRO_MODEL: ${{ secrets.GEMINI_PRO_MODEL }}
+          GEMINI_FLASH_MODEL: ${{ secrets.GEMINI_FLASH_MODEL }}
+          
+          # --- Mistral API ---
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          MISTRAL_ENDPOINT: ${{ secrets.MISTRAL_ENDPOINT }}
+          MISTRAL_LARGE: ${{ secrets.MISTRAL_LARGE }}
+          MISTRAL_SMALL: ${{ secrets.MISTRAL_SMALL }}
+
+          # --- ChromaDB Configuration ---
+          CHROMA_HOST: ${{ secrets.CHROMA_HOST }}
+          CHROMA_PORT: ${{ secrets.CHROMA_PORT }}
+          CHROMA_PERSIST_DIRECTORY: ${{ secrets.CHROMA_PERSIST_DIRECTORY }}
+          ANONYMIZED_TELEMETRY: ${{ secrets.ANONYMIZED_TELEMETRY }}
+          CHROMA_TELEMETRY: ${{ secrets.CHROMA_TELEMETRY }}
+
+          # --- Application Settings ---
+          ENVIRONMENT: ${{ secrets.ENVIRONMENT }}
+          LOG_LEVEL: ${{ secrets.LOG_LEVEL }}
+          DEBUG: ${{ secrets.DEBUG }}
+
+          # --- Newsletter Configuration ---
+          DEFAULT_NEWSLETTER_TIME: ${{ secrets.DEFAULT_NEWSLETTER_TIME }}
+          DEFAULT_TIMEZONE: ${{ secrets.DEFAULT_TIMEZONE }}
+          MAX_MESSAGES_PER_ANALYSIS: ${{ secrets.MAX_MESSAGES_PER_ANALYSIS }}
+
+          # --- Rate Limiting ---
+          RATE_LIMIT_COMMANDS_PER_MINUTE: ${{ secrets.RATE_LIMIT_COMMANDS_PER_MINUTE }}
+          RATE_LIMIT_NEWSLETTER_PER_DAY: ${{ secrets.RATE_LIMIT_NEWSLETTER_PER_DAY }}
+
+          # --- Security ---
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
+
+          # --- Monitoring ---
+          AZURE_MONITOR_CONNECTION_STRING: ${{ secrets.AZURE_MONITOR_CONNECTION_STRING }}
+          APPLICATION_INSIGHTS_INSTRUMENTATION_KEY: ${{ secrets.APPLICATION_INSIGHTS_INSTRUMENTATION_KEY }}
+
+          # --- External Services ---
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+
+          # --- Development Settings ---
+          ENABLE_MOCK_SERVICES: ${{ secrets.ENABLE_MOCK_SERVICES }}
+          MOCK_AI_RESPONSES: ${{ secrets.MOCK_AI_RESPONSES }}
+          SKIP_DISCORD_VERIFICATION: ${{ secrets.SKIP_DISCORD_VERIFICATION }}
+
+        run: |
+          echo "Writing secrets to .env file..."
+          # Create or truncate the .env file
+          > .env
+
+          # Write each variable from the step's environment to the .env file
+          echo "DISCORD_TOKEN=$DISCORD_TOKEN" >> .env
+          echo "DISCORD_CLIENT_ID=$DISCORD_CLIENT_ID" >> .env
+          echo "DISCORD_CLIENT_SECRET=$DISCORD_CLIENT_SECRET" >> .env
+          echo "AZURE_SUBSCRIPTION_ID=$AZURE_SUBSCRIPTION_ID" >> .env
+          echo "AZURE_TENANT_ID=$AZURE_TENANT_ID" >> .env
+          echo "AZURE_CLIENT_ID=$AZURE_CLIENT_ID" >> .env
+          echo "AZURE_CLIENT_SECRET=$AZURE_CLIENT_SECRET" >> .env
+          echo "COSMOS_CONNECTION_STRING=$COSMOS_CONNECTION_STRING" >> .env
+          echo "COSMOS_DATABASE_NAME=$COSMOS_DATABASE_NAME" >> .env
+          echo "COSMOS_CONTAINER_OPERATIONAL=$COSMOS_CONTAINER_OPERATIONAL" >> .env
+          echo "COSMOS_CONTAINER_CONTENT=$COSMOS_CONTAINER_CONTENT" >> .env
+          echo "BLOB_CONNECTION_STRING=$BLOB_CONNECTION_STRING" >> .env
+          echo "BLOB_CONTAINER_NAME=$BLOB_CONTAINER_NAME" >> .env
+          echo "SERVICE_BUS_CONNECTION_STRING=$SERVICE_BUS_CONNECTION_STRING" >> .env
+          echo "SERVICE_BUS_QUEUE_MESSAGES=$SERVICE_BUS_QUEUE_MESSAGES" >> .env
+          echo "SERVICE_BUS_TOPIC_EVENTS=$SERVICE_BUS_TOPIC_EVENTS" >> .env
+          echo "KEY_VAULT_URL=$KEY_VAULT_URL" >> .env
+          echo "GROQ_API_KEY=$GROQ_API_KEY" >> .env
+          echo "GROQ_ENDPOINT=$GROQ_ENDPOINT" >> .env
+          echo "GROQ_MODEL_NAME=$GROQ_MODEL_NAME" >> .env
+          echo "GROQ_THINKING_MODEL=$GROQ_THINKING_MODEL" >> .env
+          echo "GEMINI_API_KEY=$GEMINI_API_KEY" >> .env
+          echo "GEMINI_ENDPOINT=$GEMINI_ENDPOINT" >> .env
+          echo "GEMINI_PRO_MODEL=$GEMINI_PRO_MODEL" >> .env
+          echo "GEMINI_FLASH_MODEL=$GEMINI_FLASH_MODEL" >> .env
+          echo "MISTRAL_API_KEY=$MISTRAL_API_KEY" >> .env
+          echo "MISTRAL_ENDPOINT=$MISTRAL_ENDPOINT" >> .env
+          echo "MISTRAL_LARGE=$MISTRAL_LARGE" >> .env
+          echo "MISTRAL_SMALL=$MISTRAL_SMALL" >> .env
+          echo "CHROMA_HOST=$CHROMA_HOST" >> .env
+          echo "CHROMA_PORT=$CHROMA_PORT" >> .env
+          echo "CHROMA_PERSIST_DIRECTORY=$CHROMA_PERSIST_DIRECTORY" >> .env
+          echo "ANONYMIZED_TELEMETRY=$ANONYMIZED_TELEMETRY" >> .env
+          echo "CHROMA_TELEMETRY=$CHROMA_TELEMETRY" >> .env
+          echo "ENVIRONMENT=$ENVIRONMENT" >> .env
+          echo "LOG_LEVEL=$LOG_LEVEL" >> .env
+          echo "DEBUG=$DEBUG" >> .env
+          echo "DEFAULT_NEWSLETTER_TIME=$DEFAULT_NEWSLETTER_TIME" >> .env
+          echo "DEFAULT_TIMEZONE=$DEFAULT_TIMEZONE" >> .env
+          echo "MAX_MESSAGES_PER_ANALYSIS=$MAX_MESSAGES_PER_ANALYSIS" >> .env
+          echo "RATE_LIMIT_COMMANDS_PER_MINUTE=$RATE_LIMIT_COMMANDS_PER_MINUTE" >> .env
+          echo "RATE_LIMIT_NEWSLETTER_PER_DAY=$RATE_LIMIT_NEWSLETTER_PER_DAY" >> .env
+          echo "SECRET_KEY=$SECRET_KEY" >> .env
+          echo "ENCRYPTION_KEY=$ENCRYPTION_KEY" >> .env
+          echo "AZURE_MONITOR_CONNECTION_STRING=$AZURE_MONITOR_CONNECTION_STRING" >> .env
+          echo "APPLICATION_INSIGHTS_INSTRUMENTATION_KEY=$APPLICATION_INSIGHTS_INSTRUMENTATION_KEY" >> .env
+          echo "CLOUDFLARE_API_TOKEN=$CLOUDFLARE_API_TOKEN" >> .env
+          echo "CLOUDFLARE_ZONE_ID=$CLOUDFLARE_ZONE_ID" >> .env
+          echo "ENABLE_MOCK_SERVICES=$ENABLE_MOCK_SERVICES" >> .env
+          echo "MOCK_AI_RESPONSES=$MOCK_AI_RESPONSES" >> .env
+          echo "SKIP_DISCORD_VERIFICATION=$SKIP_DISCORD_VERIFICATION" >> .env
+          
+          echo "✅ .env file created successfully."
   build:
     runs-on: self-hosted
 
@@ -23,7 +169,7 @@ jobs:
 
   deploy:
     name: Deploy to Server
-    needs: build
+    needs: [create-env-file, build]
     runs-on: self-hosted
 
     steps:
