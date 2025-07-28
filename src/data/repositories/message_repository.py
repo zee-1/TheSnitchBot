@@ -41,9 +41,10 @@ class MessageRepository(BaseRepository[Message]):
             query = """
             SELECT * FROM c 
             WHERE c.server_id = @server_id 
+            AND c.entity_type = 'message'
             AND c.timestamp >= @start_time 
             AND c.timestamp <= @end_time
-            AND c.excluded_from_analysis = false
+            AND (c.excluded_from_analysis = false OR NOT IS_DEFINED(c.excluded_from_analysis))
             ORDER BY c.timestamp DESC
             """
             parameters = [
@@ -76,9 +77,10 @@ class MessageRepository(BaseRepository[Message]):
             SELECT * FROM c 
             WHERE c.server_id = @server_id 
             AND c.channel_id = @channel_id
+            AND c.entity_type = 'message'
             AND c.timestamp >= @start_time 
             AND c.timestamp <= @end_time
-            AND c.excluded_from_analysis = false
+            AND (c.excluded_from_analysis = false OR NOT IS_DEFINED(c.excluded_from_analysis))
             ORDER BY c.timestamp DESC
             """
             parameters = [
@@ -127,7 +129,8 @@ class MessageRepository(BaseRepository[Message]):
             SELECT * FROM c 
             WHERE c.server_id = @server_id 
             AND c.channel_id = @channel_id
-            AND c.excluded_from_analysis = false
+            AND c.entity_type = 'message'
+            AND (c.excluded_from_analysis = false OR NOT IS_DEFINED(c.excluded_from_analysis))
             ORDER BY c.timestamp DESC
             """
             parameters = [
@@ -158,8 +161,9 @@ class MessageRepository(BaseRepository[Message]):
             query = """
             SELECT * FROM c 
             WHERE c.server_id = @server_id 
+            AND c.entity_type = 'message'
             AND c.timestamp >= @start_time
-            AND c.excluded_from_analysis = false
+            AND (c.excluded_from_analysis = false OR NOT IS_DEFINED(c.excluded_from_analysis))
             AND (c.total_reactions + c.reply_count * 2) >= @min_engagement
             ORDER BY (c.total_reactions + c.reply_count * 2) DESC
             """
@@ -191,7 +195,8 @@ class MessageRepository(BaseRepository[Message]):
             SELECT * FROM c 
             WHERE c.server_id = @server_id 
             AND c.author_id = @author_id
-            AND c.excluded_from_analysis = false
+            AND c.entity_type = 'message'
+            AND (c.excluded_from_analysis = false OR NOT IS_DEFINED(c.excluded_from_analysis))
             ORDER BY c.timestamp DESC
             """
             parameters = [
@@ -221,9 +226,10 @@ class MessageRepository(BaseRepository[Message]):
             query = """
             SELECT * FROM c 
             WHERE c.server_id = @server_id 
+            AND c.entity_type = 'message'
             AND c.timestamp >= @start_time
             AND c.controversy_score >= @min_controversy
-            AND c.excluded_from_analysis = false
+            AND (c.excluded_from_analysis = false OR NOT IS_DEFINED(c.excluded_from_analysis))
             ORDER BY c.controversy_score DESC, c.timestamp DESC
             """
             parameters = [
@@ -253,8 +259,9 @@ class MessageRepository(BaseRepository[Message]):
             query = """
             SELECT * FROM c 
             WHERE c.server_id = @server_id 
+            AND c.entity_type = 'message'
             AND c.timestamp >= @start_time
-            AND c.excluded_from_analysis = false
+            AND (c.excluded_from_analysis = false OR NOT IS_DEFINED(c.excluded_from_analysis))
             AND (
                 c.controversy_score >= 0.3 
                 OR c.total_reactions >= 3 
@@ -478,8 +485,9 @@ class MessageRepository(BaseRepository[Message]):
             query = """
             SELECT * FROM c 
             WHERE c.server_id = @server_id
+            AND c.entity_type = 'message'
             AND CONTAINS(UPPER(c.content), UPPER(@search_term))
-            AND c.excluded_from_analysis = false
+            AND (c.excluded_from_analysis = false OR NOT IS_DEFINED(c.excluded_from_analysis))
             ORDER BY c.timestamp DESC
             """
             parameters = [
@@ -523,9 +531,10 @@ class MessageRepository(BaseRepository[Message]):
             query = f"""
             SELECT * FROM c 
             WHERE c.server_id = @server_id
+            AND c.entity_type = 'message'
             AND c.timestamp >= @start_time
             AND ({keyword_clause})
-            AND c.excluded_from_analysis = false
+            AND (c.excluded_from_analysis = false OR NOT IS_DEFINED(c.excluded_from_analysis))
             ORDER BY c.timestamp DESC
             """
             

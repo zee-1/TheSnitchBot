@@ -101,17 +101,27 @@ Provide exactly {max_stories} story candidates.
 
         # Helper functions to handle both Message objects and dicts
         def get_total_reactions(m):
-            return getattr(m, "total_reactions", m.get("total_reactions", 0))
+            if hasattr(m, 'total_reactions'):
+                return m.total_reactions
+            elif hasattr(m, 'get'):
+                return m.get("total_reactions", 0)
+            else:
+                return getattr(m, "total_reactions", 0)
 
         def get_reply_count(m):
-            return getattr(m, "reply_count", m.get("reply_count", 0))
+            if hasattr(m, 'reply_count'):
+                return m.reply_count
+            elif hasattr(m, 'get'):
+                return m.get("reply_count", 0)
+            else:
+                return getattr(m, "reply_count", 0)
 
         def get_controversy_score(m):
             if hasattr(m, "controversy_score"):
                 return m.controversy_score
             else:
-                reactions = m.get("total_reactions", 0)
-                replies = m.get("reply_count", 0)
+                reactions = get_total_reactions(m)
+                replies = get_reply_count(m)
                 return min((reactions + replies) / 20.0, 1.0)
 
         # Sort messages by engagement score (reactions + replies + controversy)
